@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
-import { Patient, getAmountDue, formatCurrency } from '../types';
-import { PlusCircle, Calculator } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Patient, formatCurrency } from '../types';
+import { PlusCircle, Calculator, Save, X } from 'lucide-react';
 
 interface PatientFormProps {
-  onAddPatient: (patient: Patient) => void;
+  onSubmit: (patient: Patient) => void;
+  initialData?: Patient;
+  onCancel?: () => void;
 }
 
-const initialPatient: Omit<Patient, 'id'> = {
+const defaultPatient: Omit<Patient, 'id'> = {
   firstName: '',
   lastName: '',
   pesel: '',
@@ -29,8 +31,14 @@ const initialPatient: Omit<Patient, 'id'> = {
   notes: ''
 };
 
-const PatientForm: React.FC<PatientFormProps> = ({ onAddPatient }) => {
-  const [formData, setFormData] = useState(initialPatient);
+const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCancel }) => {
+  const [formData, setFormData] = useState<Omit<Patient, 'id'> | Patient>(defaultPatient);
+
+  useEffect(() => {
+    if (initialData) {
+      setFormData(initialData);
+    }
+  }, [initialData]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -42,13 +50,19 @@ const PatientForm: React.FC<PatientFormProps> = ({ onAddPatient }) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const newPatient: Patient = {
+    
+    // If editing (initialData exists), use existing ID, otherwise generate new
+    const patientToSave: Patient = {
       ...formData,
-      id: crypto.randomUUID()
+      id: initialData?.id || crypto.randomUUID()
     };
-    onAddPatient(newPatient);
-    setFormData(initialPatient);
-    alert("Pacjent został dodany do bazy.");
+
+    onSubmit(patientToSave);
+    
+    if (!initialData) {
+        setFormData(defaultPatient);
+        alert("Pacjent został dodany do bazy.");
+    }
   };
 
   const amountDue = formData.totalAmount - formData.amountPaid;
@@ -57,12 +71,21 @@ const PatientForm: React.FC<PatientFormProps> = ({ onAddPatient }) => {
   const inputClass = "p-2.5 border border-gray-300 rounded-lg w-full bg-white text-black placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all shadow-sm";
   const labelClass = "text-xs text-gray-700 font-bold mb-1 block uppercase tracking-wide";
 
+  const isEditing = !!initialData;
+
   return (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-      <h2 className="text-xl font-bold text-teal-800 mb-6 flex items-center gap-2">
-        <PlusCircle className="w-6 h-6" />
-        Nowy Pacjent
-      </h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-bold text-teal-800 flex items-center gap-2">
+          {isEditing ? <Save className="w-6 h-6" /> : <PlusCircle className="w-6 h-6" />}
+          {isEditing ? 'Edycja Danych Pacjenta' : 'Nowy Pacjent'}
+        </h2>
+        {isEditing && onCancel && (
+          <button onClick={onCancel} className="text-gray-500 hover:text-red-500">
+            <X className="w-6 h-6" />
+          </button>
+        )}
+      </div>
       
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Section 1: Personal */}
@@ -155,9 +178,16 @@ const PatientForm: React.FC<PatientFormProps> = ({ onAddPatient }) => {
           </div>
         </div>
 
-        <button type="submit" className="w-full md:w-auto px-8 py-3 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition-colors shadow-md hover:shadow-lg">
-          Zapisz Pacjenta
-        </button>
+        <div className="flex gap-4">
+            <button type="submit" className="w-full md:w-auto px-8 py-3 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition-colors shadow-md hover:shadow-lg">
+            {isEditing ? 'Zapisz Zmiany' : 'Zapisz Pacjenta'}
+            </button>
+            {isEditing && onCancel && (
+                 <button type="button" onClick={onCancel} className="w-full md:w-auto px-8 py-3 bg-gray-200 text-gray-700 font-bold rounded-lg hover:bg-gray-300 transition-colors">
+                 Anuluj
+                 </button>
+            )}
+        </div>
       </form>
     </div>
   );

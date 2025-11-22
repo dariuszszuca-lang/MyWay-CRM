@@ -17,6 +17,12 @@ const App: React.FC = () => {
     setPatients(patients.map(p => p.id === updatedPatient.id ? updatedPatient : p));
   };
 
+  const handleDeletePatient = (id: string) => {
+    if (window.confirm('Czy na pewno chcesz usunąć tego pacjenta? Tej operacji nie można cofnąć.')) {
+      setPatients(patients.filter(p => p.id !== id));
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* Navigation Header */}
@@ -66,7 +72,7 @@ const App: React.FC = () => {
               <h2 className="text-2xl font-bold text-gray-800">Rejestracja Pacjenta</h2>
               <p className="text-gray-500">Wprowadź dane, aby wygenerować umowę i kartę pacjenta.</p>
             </div>
-            <PatientForm onAddPatient={handleAddPatient} />
+            <PatientForm onSubmit={handleAddPatient} />
           </div>
         ) : (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -82,7 +88,11 @@ const App: React.FC = () => {
                 + Dodaj nowego
               </button>
             </div>
-            <PatientList patients={patients} onUpdatePatient={handleUpdatePatient} />
+            <PatientList 
+              patients={patients} 
+              onUpdatePatient={handleUpdatePatient} 
+              onDeletePatient={handleDeletePatient}
+            />
           </div>
         )}
       </main>

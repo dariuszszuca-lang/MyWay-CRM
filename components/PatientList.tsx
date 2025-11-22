@@ -1,21 +1,29 @@
 import React, { useState } from 'react';
 import { Patient, formatCurrency, getAmountDue } from '../types';
-import { FileText, User, ScrollText, MessageCircle, CheckSquare, Square } from 'lucide-react';
+import { FileText, User, ScrollText, MessageCircle, CheckSquare, Square, Pencil, Trash2 } from 'lucide-react';
 import { generateContract, generatePatientCard, generateRegulations } from '../services/pdfGenerator';
+import PatientForm from './PatientForm';
 
 interface PatientListProps {
   patients: Patient[];
   onUpdatePatient: (patient: Patient) => void;
+  onDeletePatient: (id: string) => void;
 }
 
-const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient }) => {
+const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, onDeletePatient }) => {
   const [filterPackage, setFilterPackage] = useState<'all' | '1' | '2' | '3'>('all');
+  const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
 
   const filteredPatients = patients.filter(p => filterPackage === 'all' ? true : p.package === filterPackage);
 
   const getWhatsAppLink = (phone: string) => {
     const cleanNumber = phone.replace(/[^0-9]/g, '');
     return `https://wa.me/48${cleanNumber}`;
+  };
+
+  const handleSaveEdit = (updatedPatient: Patient) => {
+    onUpdatePatient(updatedPatient);
+    setEditingPatient(null);
   };
 
   if (patients.length === 0) {
@@ -27,7 +35,20 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient }) 
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 relative">
+      {/* Modal for Editing */}
+      {editingPatient && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="w-full max-w-4xl my-8 animate-in fade-in zoom-in duration-200">
+             <PatientForm 
+                initialData={editingPatient} 
+                onSubmit={handleSaveEdit} 
+                onCancel={() => setEditingPatient(null)} 
+             />
+          </div>
+        </div>
+      )}
+
       {/* Package Tabs */}
       <div className="flex gap-2 bg-white p-2 rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
         {(['all', '1', '2', '3'] as const).map((pkg) => (
@@ -73,7 +94,17 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient }) 
                 <tr key={patient.id} className="hover:bg-gray-50 group">
                   {/* Pacjent / Adres */}
                   <td className="p-3 align-top">
-                    <div className="font-bold text-gray-900 text-base">{patient.firstName} {patient.lastName}</div>
+                    <div className="flex items-start justify-between">
+                         <div className="font-bold text-gray-900 text-base">{patient.firstName} {patient.lastName}</div>
+                         <div className="flex gap-1 ml-2">
+                            <button onClick={() => setEditingPatient(patient)} className="p-1 text-gray-400 hover:text-teal-600" title="Edytuj dane">
+                                <Pencil className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => onDeletePatient(patient.id)} className="p-1 text-gray-400 hover:text-red-600" title="Usuń pacjenta">
+                                <Trash2 className="w-4 h-4" />
+                            </button>
+                         </div>
+                    </div>
                     <div className="text-xs text-gray-500 mb-1">PESEL: {patient.pesel}</div>
                     <div className="text-xs text-gray-700 mt-2 bg-gray-100 p-1.5 rounded inline-block">
                       {patient.voivodeship}<br/>
@@ -150,7 +181,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient }) 
                           min="0"
                           value={patient.onlineConsultations}
                           onChange={(e) => onUpdatePatient({ ...patient, onlineConsultations: parseInt(e.target.value) || 0 })}
-                          className="w-16 p-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-white text-black"
+                          className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-white text-black [&::-webkit-inner-spin-button]:appearance-auto [&::-webkit-inner-spin-button]:opacity-100"
                         />
                         <span className="text-xs text-gray-500">szt.</span>
                       </div>
