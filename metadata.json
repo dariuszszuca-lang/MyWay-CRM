@@ -1,0 +1,5 @@
+{
+  "name": "MyWay CRM",
+  "description": "System CRM dla ośrodka leczenia uzależnień MyWay do zarządzania pacjentami i generowania dokumentacji (Umowa, Karta Pacjenta).",
+  "requestFramePermissions": []
+}
