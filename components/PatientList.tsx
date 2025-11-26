@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Patient, formatCurrency, getAmountDue } from '../types';
-import { FileText, User, ScrollText, MessageCircle, CheckSquare, Square, Pencil, Trash2 } from 'lucide-react';
+import { FileText, User, ScrollText, MessageCircle, CheckSquare, Square, Pencil, Trash2, Search, Wallet, X, CheckCircle } from 'lucide-react';
 import { generateContract, generatePatientCard, generateRegulations } from '../services/pdfGenerator';
 import PatientForm from './PatientForm';
 
@@ -13,8 +13,21 @@ interface PatientListProps {
 const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, onDeletePatient }) => {
   const [filterPackage, setFilterPackage] = useState<'all' | '1' | '2' | '3'>('all');
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // State for Payment Modal
+  const [paymentModalPatient, setPaymentModalPatient] = useState<Patient | null>(null);
+  const [paymentAmountPaid, setPaymentAmountPaid] = useState<number>(0);
 
-  const filteredPatients = patients.filter(p => filterPackage === 'all' ? true : p.package === filterPackage);
+  // Filter Logic: Package + Search
+  const filteredPatients = patients.filter(p => {
+    const matchesPackage = filterPackage === 'all' || p.package === filterPackage;
+    const searchLower = searchQuery.toLowerCase();
+    const matchesSearch = p.firstName.toLowerCase().includes(searchLower) || 
+                          p.lastName.toLowerCase().includes(searchLower) ||
+                          p.pesel.includes(searchLower);
+    return matchesPackage && matchesSearch;
+  });
 
   const getWhatsAppLink = (phone: string) => {
     const cleanNumber = phone.replace(/[^0-9]/g, '');
@@ -24,6 +37,28 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
   const handleSaveEdit = (updatedPatient: Patient) => {
     onUpdatePatient(updatedPatient);
     setEditingPatient(null);
+  };
+
+  // Payment Modal Handlers
+  const openPaymentModal = (patient: Patient) => {
+    setPaymentModalPatient(patient);
+    setPaymentAmountPaid(patient.amountPaid);
+  };
+
+  const handleSavePayment = () => {
+    if (paymentModalPatient) {
+      onUpdatePatient({
+        ...paymentModalPatient,
+        amountPaid: paymentAmountPaid
+      });
+      setPaymentModalPatient(null);
+    }
+  };
+
+  const handlePayInFull = () => {
+    if (paymentModalPatient) {
+      setPaymentAmountPaid(paymentModalPatient.totalAmount);
+    }
   };
 
   if (patients.length === 0) {
@@ -49,32 +84,129 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
         </div>
       )}
 
-      {/* Package Tabs */}
-      <div className="flex gap-2 bg-white p-2 rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
-        {(['all', '1', '2', '3'] as const).map((pkg) => (
-          <button
-            key={pkg}
-            onClick={() => setFilterPackage(pkg)}
-            className={`px-6 py-2 rounded-lg text-sm font-bold transition-colors whitespace-nowrap ${
-              filterPackage === pkg 
-                ? 'bg-teal-600 text-white shadow-md' 
-                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            {pkg === 'all' ? 'Wszyscy pacjenci' : `Pakiet ${pkg}`}
-          </button>
-        ))}
+      {/* Modal for Quick Payment */}
+      {paymentModalPatient && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Rozlicz Płatność</h3>
+              <button onClick={() => setPaymentModalPatient(null)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="mb-6 space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Pacjent:</span>
+                <span className="font-semibold">{paymentModalPatient.firstName} {paymentModalPatient.lastName}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Całkowity koszt:</span>
+                <span className="font-bold">{formatCurrency(paymentModalPatient.totalAmount)}</span>
+              </div>
+              <hr />
+              
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Wpłacona kwota (PLN)</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="number" 
+                    value={paymentAmountPaid}
+                    onChange={(e) => setPaymentAmountPaid(Number(e.target.value))}
+                    className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none text-right font-mono text-lg bg-white text-black"
+                  />
+                  <button 
+                    onClick={handlePayInFull}
+                    className="px-3 py-2 bg-teal-100 text-teal-700 rounded-lg hover:bg-teal-200 text-sm font-medium whitespace-nowrap"
+                  >
+                    Opłać całość
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg mt-2">
+                <span className="text-sm font-medium text-gray-600">Pozostaje do zapłaty:</span>
+                <span className={`font-mono font-bold ${paymentModalPatient.totalAmount - paymentAmountPaid > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                  {formatCurrency(paymentModalPatient.totalAmount - paymentAmountPaid)}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button 
+                onClick={handleSavePayment}
+                className="flex-1 bg-teal-600 text-white py-2.5 rounded-lg font-bold hover:bg-teal-700 transition-colors flex items-center justify-center gap-2"
+              >
+                <CheckCircle className="w-4 h-4" />
+                Zatwierdź
+              </button>
+              <button 
+                onClick={() => setPaymentModalPatient(null)}
+                className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-lg font-bold hover:bg-gray-200 transition-colors"
+              >
+                Anuluj
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Top Bar: Search & Filters */}
+      <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-white p-3 rounded-xl shadow-sm border border-gray-100">
+        
+        {/* Search Bar */}
+        <div className="relative w-full md:w-64">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-4 w-4 text-gray-400" />
+          </div>
+          <input
+            type="text"
+            placeholder="Szukaj pacjenta..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="block w-full pl-10 pr-3 py-2 border border-gray-200 rounded-lg leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 sm:text-sm transition duration-150 ease-in-out text-black"
+          />
+        </div>
+
+        {/* Package Tabs */}
+        <div className="flex gap-2 overflow-x-auto w-full md:w-auto">
+          {(['all', '1', '2', '3'] as const).map((pkg) => (
+            <button
+              key={pkg}
+              onClick={() => setFilterPackage(pkg)}
+              className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-colors whitespace-nowrap ${
+                filterPackage === pkg 
+                  ? 'bg-teal-600 text-white shadow-sm' 
+                  : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              {pkg === 'all' ? 'Wszyscy' : `Pakiet ${pkg}`}
+            </button>
+          ))}
+        </div>
+
+        {/* PDF Download Button */}
+        <div className="hidden md:block">
+            <button 
+              onClick={() => generateRegulations()}
+              className="flex items-center gap-2 text-sm text-teal-700 hover:text-teal-800 font-medium px-3 py-1.5 rounded hover:bg-teal-50 transition-colors"
+            >
+              <ScrollText className="w-4 h-4" />
+              Regulamin (PDF)
+            </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-end">
-          <button 
-            onClick={() => generateRegulations()}
-            className="flex items-center gap-2 text-sm text-teal-700 hover:text-teal-800 font-medium px-3 py-1.5 rounded hover:bg-teal-100 transition-colors"
-          >
-            <ScrollText className="w-4 h-4" />
-            Pobierz Regulamin Ośrodka (PDF)
-          </button>
+        {/* Mobile only header for PDF button */}
+        <div className="md:hidden p-4 bg-gray-50 border-b border-gray-200 flex justify-end">
+            <button 
+              onClick={() => generateRegulations()}
+              className="flex items-center gap-2 text-sm text-teal-700 hover:text-teal-800 font-medium px-3 py-1.5 rounded hover:bg-teal-100 transition-colors"
+            >
+              <ScrollText className="w-4 h-4" />
+              Pobierz Regulamin
+            </button>
         </div>
         
         <div className="overflow-x-auto">
@@ -90,7 +222,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredPatients.map((patient) => (
+              {filteredPatients.length > 0 ? filteredPatients.map((patient) => (
                 <tr key={patient.id} className="hover:bg-gray-50 group">
                   {/* Pacjent / Adres */}
                   <td className="p-3 align-top">
@@ -143,8 +275,20 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                     <div className="text-xs text-gray-600 mb-2">
                       <span className="font-semibold">Koniec:</span> {patient.treatmentEndDate}
                     </div>
-                    <div className="text-xs mt-2 pt-2 border-t border-gray-200">
-                      Do zapłaty: <span className="font-mono font-bold text-red-600">{formatCurrency(getAmountDue(patient))}</span>
+                    <div className="text-xs mt-2 pt-2 border-t border-gray-200 flex items-center justify-between">
+                      <div className="flex flex-col">
+                        <span className="text-gray-500 text-[10px] uppercase">Do zapłaty:</span>
+                        <span className={`font-mono font-bold ${getAmountDue(patient) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          {formatCurrency(getAmountDue(patient))}
+                        </span>
+                      </div>
+                      <button 
+                        onClick={() => openPaymentModal(patient)}
+                        className={`p-1.5 rounded-full transition-colors ${getAmountDue(patient) > 0 ? 'text-teal-600 hover:bg-teal-50' : 'text-gray-300 hover:bg-gray-100'}`}
+                        title="Rozlicz płatność"
+                      >
+                        <Wallet className="w-4 h-4" />
+                      </button>
                     </div>
                   </td>
 
@@ -216,7 +360,13 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                     </button>
                   </td>
                 </tr>
-              ))}
+              )) : (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-gray-500">
+                    Nie znaleziono pacjentów pasujących do wyszukiwania "{searchQuery}".
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
