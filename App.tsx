@@ -2,75 +2,85 @@ import React, { useState, useEffect } from 'react';
 import { Patient } from './types';
 import PatientForm from './components/PatientForm';
 import PatientList from './components/PatientList';
-import { Activity, Users, Download, Upload, Database } from 'lucide-react';
+import { Activity, Users, Download, Upload, Cloud, RefreshCw } from 'lucide-react';
+import { db } from './firebaseConfig';
+import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
 
 const App: React.FC = () => {
-  // Inicjalizacja stanu z LocalStorage (jeśli dane istnieją)
-  const [patients, setPatients] = useState<Patient[]>(() => {
-    const saved = localStorage.getItem('myway_patients');
-    return saved ? JSON.parse(saved) : [];
-  });
-  
+  const [patients, setPatients] = useState<Patient[]>([]);
   const [activeTab, setActiveTab] = useState<'form' | 'list'>('form');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Automatyczny zapis do LocalStorage przy każdej zmianie listy pacjentów
+  // Pobieranie danych z chmury w czasie rzeczywistym
   useEffect(() => {
-    localStorage.setItem('myway_patients', JSON.stringify(patients));
-  }, [patients]);
+    setLoading(true);
+    // Nasłuchuj zmian w kolekcji "patients"
+    const q = query(collection(db, "patients"), orderBy("lastName"));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const patientsData: Patient[] = snapshot.docs.map(doc => ({
+        ...doc.data() as Omit<Patient, 'id'>,
+        id: doc.id // Nadpisujemy ID tym z bazy danych
+      }));
+      setPatients(patientsData);
+      setLoading(false);
+      setError(null);
+    }, (err) => {
+      console.error("Błąd połączenia z bazą:", err);
+      setError("Nie można połączyć się z bazą danych. Sprawdź plik firebaseConfig.ts");
+      setLoading(false);
+    });
 
-  const handleAddPatient = (patient: Patient) => {
-    setPatients([patient, ...patients]);
-    setActiveTab('list');
-  };
+    return () => unsubscribe();
+  }, []);
 
-  const handleUpdatePatient = (updatedPatient: Patient) => {
-    setPatients(patients.map(p => p.id === updatedPatient.id ? updatedPatient : p));
-  };
-
-  const handleDeletePatient = (id: string) => {
-    if (window.confirm('Czy na pewno chcesz usunąć tego pacjenta? Tej operacji nie można cofnąć.')) {
-      setPatients(patients.filter(p => p.id !== id));
+  const handleAddPatient = async (patientData: Patient) => {
+    try {
+      // Usuwamy sztuczne ID generowane przez formularz, baza nada własne
+      const { id, ...dataToSave } = patientData;
+      await addDoc(collection(db, "patients"), dataToSave);
+      setActiveTab('list');
+    } catch (err) {
+      alert("Błąd podczas dodawania pacjenta do chmury.");
+      console.error(err);
     }
   };
 
-  // Funkcja eksportu bazy do pliku JSON
+  const handleUpdatePatient = async (updatedPatient: Patient) => {
+    try {
+      const patientRef = doc(db, "patients", updatedPatient.id);
+      // Destrukturyzacja, żeby nie zapisywać ID wewnątrz dokumentu (jest ono w nazwie dokumentu)
+      const { id, ...dataToUpdate } = updatedPatient;
+      await updateDoc(patientRef, dataToUpdate);
+    } catch (err) {
+      alert("Błąd podczas aktualizacji danych.");
+      console.error(err);
+    }
+  };
+
+  const handleDeletePatient = async (id: string) => {
+    if (window.confirm('Czy na pewno chcesz usunąć tego pacjenta? Tej operacji nie można cofnąć.')) {
+      try {
+        await deleteDoc(doc(db, "patients", id));
+      } catch (err) {
+        alert("Błąd podczas usuwania pacjenta.");
+        console.error(err);
+      }
+    }
+  };
+
+  // Eksport bazy (nadal przydatne jako kopia lokalna)
   const handleExport = () => {
     const dataStr = JSON.stringify(patients, null, 2);
     const blob = new Blob([dataStr], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `baza_pacjentow_myway_${new Date().toISOString().split('T')[0]}.json`;
+    link.download = `kopia_bazy_myway_${new Date().toISOString().split('T')[0]}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
-
-  // Funkcja importu bazy z pliku JSON
-  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      if (window.confirm('UWAGA: Importowanie bazy NADPISZE obecne dane. Czy chcesz kontynuować?')) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          try {
-            const content = e.target?.result as string;
-            const parsed = JSON.parse(content);
-            if (Array.isArray(parsed)) {
-              setPatients(parsed);
-              alert('Baza została pomyślnie zaimportowana.');
-            } else {
-              alert('Nieprawidłowy format pliku.');
-            }
-          } catch (error) {
-            alert('Błąd podczas importu pliku. Upewnij się, że to poprawny plik bazy danych.');
-          }
-        };
-        reader.readAsText(file);
-      }
-      // Reset inputa, aby można było wybrać ten sam plik ponownie
-      event.target.value = '';
-    }
   };
 
   return (
@@ -84,7 +94,10 @@ const App: React.FC = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold text-gray-900 tracking-tight">MyWay CRM</h1>
-              <p className="text-xs text-gray-500">Ośrodek Leczenia Uzależnień</p>
+              <div className="flex items-center gap-1">
+                <Cloud className="w-3 h-3 text-green-500" />
+                <p className="text-xs text-green-600 font-medium">Baza Online</p>
+              </div>
             </div>
           </div>
           
@@ -94,16 +107,11 @@ const App: React.FC = () => {
                <button 
                 onClick={handleExport}
                 className="flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-teal-700 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded transition-colors"
-                title="Pobierz kopię zapasową bazy danych"
+                title="Pobierz kopię zapasową bazy danych na dysk"
               >
                 <Download className="w-4 h-4" />
-                <span className="hidden sm:inline">Eksportuj</span>
+                <span className="hidden sm:inline">Pobierz Kopię</span>
               </button>
-              <label className="flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-teal-700 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded transition-colors cursor-pointer" title="Wgraj kopię zapasową">
-                <Upload className="w-4 h-4" />
-                <span className="hidden sm:inline">Importuj</span>
-                <input type="file" accept=".json" onChange={handleImport} className="hidden" />
-              </label>
             </div>
 
             <nav className="flex gap-2">
@@ -135,35 +143,53 @@ const App: React.FC = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {activeTab === 'form' ? (
-          <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-             <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">Rejestracja Pacjenta</h2>
-              <p className="text-gray-500">Wprowadź dane, aby wygenerować umowę i kartę pacjenta.</p>
+        {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+                <strong className="font-bold">Błąd konfiguracji! </strong>
+                <span className="block sm:inline">{error}</span>
             </div>
-            <PatientForm onSubmit={handleAddPatient} />
-          </div>
+        )}
+
+        {loading ? (
+            <div className="flex justify-center items-center h-64">
+                <div className="flex flex-col items-center gap-3">
+                    <RefreshCw className="w-8 h-8 text-teal-600 animate-spin" />
+                    <p className="text-gray-500">Łączenie z bazą danych...</p>
+                </div>
+            </div>
         ) : (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-800">Lista Pacjentów</h2>
-                <p className="text-gray-500">Zarządzaj dokumentacją i monitoruj postępy.</p>
-              </div>
-              <button 
-                onClick={() => setActiveTab('form')} 
-                className="bg-teal-600 hover:bg-teal-700 text-white text-sm px-4 py-2 rounded-lg font-medium transition-colors shadow-sm hover:shadow flex items-center gap-2"
-              >
-                <Activity className="w-4 h-4" />
-                + Dodaj nowego
-              </button>
-            </div>
-            <PatientList 
-              patients={patients} 
-              onUpdatePatient={handleUpdatePatient} 
-              onDeletePatient={handleDeletePatient}
-            />
-          </div>
+            <>
+                {activeTab === 'form' ? (
+                <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="mb-6">
+                    <h2 className="text-2xl font-bold text-gray-800">Rejestracja Pacjenta</h2>
+                    <p className="text-gray-500">Dane zostaną zapisane w chmurze i będą widoczne dla wszystkich.</p>
+                    </div>
+                    <PatientForm onSubmit={handleAddPatient} />
+                </div>
+                ) : (
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-800">Lista Pacjentów</h2>
+                        <p className="text-gray-500">Synchronizacja w czasie rzeczywistym.</p>
+                    </div>
+                    <button 
+                        onClick={() => setActiveTab('form')} 
+                        className="bg-teal-600 hover:bg-teal-700 text-white text-sm px-4 py-2 rounded-lg font-medium transition-colors shadow-sm hover:shadow flex items-center gap-2"
+                    >
+                        <Activity className="w-4 h-4" />
+                        + Dodaj nowego
+                    </button>
+                    </div>
+                    <PatientList 
+                    patients={patients} 
+                    onUpdatePatient={handleUpdatePatient} 
+                    onDeletePatient={handleDeletePatient}
+                    />
+                </div>
+                )}
+            </>
         )}
       </main>
     </div>
