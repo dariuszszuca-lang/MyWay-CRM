@@ -1,23 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider } from '../firebaseConfig';
-import { LogIn, ShieldCheck, Activity } from 'lucide-react';
+import { LogIn, ShieldCheck, Activity, AlertTriangle } from 'lucide-react';
 
-const Login: React.FC = () => {
-  const [error, setError] = useState<string | null>(null);
+interface LoginProps {
+  permissionError?: string | null;
+}
+
+const Login: React.FC<LoginProps> = ({ permissionError }) => {
+  const [internalError, setInternalError] = useState<string | null>(null);
+
+  // Jeśli pojawi się błąd uprawnień z App.tsx, pokaż go
+  useEffect(() => {
+    if (permissionError) {
+      setInternalError(permissionError);
+    }
+  }, [permissionError]);
 
   const handleLogin = async () => {
     try {
-      setError(null);
+      setInternalError(null);
       await signInWithPopup(auth, googleProvider);
     } catch (err: any) {
       console.error(err);
       if (err.code === 'auth/popup-closed-by-user') {
-        setError("Okno logowania zostało zamknięte.");
+        setInternalError("Okno logowania zostało zamknięte.");
       } else if (err.code === 'auth/cancelled-popup-request') {
         // Ignoruj podwójne kliknięcia
+      } else if (err.code === 'auth/api-key-not-valid.-please-pass-a-valid-api-key.') {
+        setInternalError("Błąd konfiguracji: Niepoprawny klucz API w pliku firebaseConfig.ts");
       } else {
-        setError("Błąd logowania. Upewnij się, że dodałeś domenę w Firebase Console.");
+        setInternalError("Błąd logowania. Sprawdź konsolę lub ustawienia domeny w Firebase.");
       }
     }
   };
@@ -39,9 +52,12 @@ const Login: React.FC = () => {
             <p className="text-gray-500 text-sm mt-1">Zaloguj się, aby uzyskać dostęp do bazy</p>
           </div>
 
-          {error && (
-            <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg mb-4 text-center border border-red-100">
-              {error}
+          {internalError && (
+            <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg mb-4 text-center border border-red-100 flex flex-col items-center gap-1">
+              <div className="flex items-center gap-2 font-bold">
+                 <AlertTriangle className="w-4 h-4" /> Błąd
+              </div>
+              {internalError}
             </div>
           )}
 

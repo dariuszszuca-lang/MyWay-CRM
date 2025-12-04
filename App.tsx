@@ -8,25 +8,51 @@ import { db, auth } from './firebaseConfig';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 
+// --- KONFIGURACJA DOSTĘPU (BIAŁA LISTA) ---
+// Wpisz tutaj w cudzysłowach adresy email, które mają mieć dostęp do panelu.
+// Oddzielaj je przecinkami.
+const ALLOWED_EMAILS = [
+  "dariusz.szuca@gmail.com",
+  "inny.admin@gmail.com",
+  // "pracownik3@gmail.com"
+];
+
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [permissionError, setPermissionError] = useState<string | null>(null);
   
   const [patients, setPatients] = useState<Patient[]>([]);
   const [activeTab, setActiveTab] = useState<'form' | 'list'>('form');
   const [dataLoading, setDataLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 1. Sprawdzanie stanu zalogowania
+  // 1. Sprawdzanie stanu zalogowania i UPRAWNIEŃ
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+      if (currentUser) {
+        // Sprawdź czy mail jest na liście (ignoruj wielkość liter)
+        const userEmail = currentUser.email?.toLowerCase() || '';
+        const isAllowed = ALLOWED_EMAILS.some(allowed => allowed.toLowerCase() === userEmail);
+
+        if (isAllowed) {
+          setUser(currentUser);
+          setPermissionError(null);
+        } else {
+          // Użytkownik zalogowany w Google, ale nie ma go na liście -> Wyloguj i pokaż błąd
+          signOut(auth);
+          setUser(null);
+          setPermissionError(`Brak dostępu dla adresu: ${userEmail}. Skontaktuj się z administratorem.`);
+        }
+      } else {
+        setUser(null);
+      }
       setAuthLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
-  // 2. Pobieranie danych z chmury (tylko gdy zalogowany)
+  // 2. Pobieranie danych z chmury (tylko gdy zalogowany i zweryfikowany)
   useEffect(() => {
     if (!user) {
         setPatients([]);
@@ -118,7 +144,7 @@ const App: React.FC = () => {
 
   // Jeśli nie zalogowany -> Pokaż Login
   if (!user) {
-    return <Login />;
+    return <Login permissionError={permissionError} />;
   }
 
   // Jeśli zalogowany -> Pokaż Aplikację
