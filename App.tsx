@@ -13,8 +13,8 @@ import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 // Oddzielaj je przecinkami.
 const ALLOWED_EMAILS = [
   "dariusz.szuca@gmail.com",
-  "inny.admin@gmail.com",
-  // "pracownik3@gmail.com"
+  "krystiannagaba@gmail.com",
+  "mywaymarcin@gmail.com"
 ];
 
 const App: React.FC = () => {
