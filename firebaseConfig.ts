@@ -8,12 +8,12 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 // Pamiętaj, żeby zostawić cudzysłowy!
 
 const firebaseConfig = {
-  apiKey: "WKLEJ_TU_API_KEY",
-  authDomain: "WKLEJ_TU_AUTH_DOMAIN",
-  projectId: "WKLEJ_TU_PROJECT_ID",
-  storageBucket: "WKLEJ_TU_STORAGE_BUCKET",
-  messagingSenderId: "WKLEJ_TU_MESSAGING_SENDER_ID",
-  appId: "WKLEJ_TU_APP_ID"
+  apiKey: "AIzaSyB_kr_85LmJEEHgG0D-NRtJsvD6i9IAuSo",
+  authDomain: "myway-crm-a4593.firebaseapp.com",
+  projectId: "myway-crm-a4593",
+  storageBucket: "myway-crm-a4593.firebasestorage.app",
+  messagingSenderId: "867189110896",
+  appId: "1:867189110896:web:085d33d9d19fc1e1acdcb5"
 };
 
 // Inicjalizacja połączenia
