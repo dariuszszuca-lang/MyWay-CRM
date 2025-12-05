@@ -16,7 +16,7 @@ const ALLOWED_EMAILS = [
   "krystiannagaba@gmail.com",
   "mywaymarcin@gmail.com",
   "npucz708@gmail.com,
-  "gabinet.osrodekmyway@gmail.com"
+  "gabinet.osrodekmyway@gmail.com",
 ];
 
 const App: React.FC = () => {
