@@ -14,7 +14,9 @@ import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 const ALLOWED_EMAILS = [
   "dariusz.szuca@gmail.com",
   "krystiannagaba@gmail.com",
-  "mywaymarcin@gmail.com"
+  "mywaymarcin@gmail.com",
+  "npucz708@gmail.com,
+  "gabinet.osrodekmyway@gmail.com"
 ];
 
 const App: React.FC = () => {
