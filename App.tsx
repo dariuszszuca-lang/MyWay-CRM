@@ -7,6 +7,7 @@ import { Activity, Users, Download, Cloud, RefreshCw, LogOut } from 'lucide-reac
 import { db, auth } from './firebaseConfig';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
+import { sendWelcomeEmail } from './services/getResponseService';
 
 // --- KONFIGURACJA DOSTĘPU (BIAŁA LISTA) ---
 // Wpisz tutaj w cudzysłowach adresy email, które mają mieć dostęp do panelu.
@@ -88,6 +89,16 @@ const App: React.FC = () => {
     try {
       const { id, ...dataToSave } = patientData;
       await addDoc(collection(db, "patients"), dataToSave);
+
+      // Wyślij mail powitalny przez GetResponse
+      sendWelcomeEmail({
+        email: patientData.email,
+        firstName: patientData.firstName,
+        lastName: patientData.lastName,
+        package: patientData.package,
+        phone: patientData.phone
+      });
+
       setActiveTab('list');
     } catch (err) {
       alert("Błąd podczas dodawania pacjenta do chmury.");
