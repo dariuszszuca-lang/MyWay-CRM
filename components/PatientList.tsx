@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Patient, formatCurrency, getAmountDue } from '../types';
-import { FileText, User, ScrollText, MessageCircle, CheckSquare, Square, Pencil, Trash2, Search, Wallet, X, CheckCircle } from 'lucide-react';
+import { FileText, User, ScrollText, MessageCircle, CheckSquare, Square, Pencil, Trash2, Search, Wallet, X, CheckCircle, MapPin, Calendar, Filter, CreditCard } from 'lucide-react';
 import { generateContract, generatePatientCard, generateRegulations } from '../services/pdfGenerator';
 import PatientForm from './PatientForm';
 
@@ -14,20 +14,61 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
   const [filterPackage, setFilterPackage] = useState<'all' | '1' | '2' | '3'>('all');
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  
+
+  // New filters
+  const [filterVoivodeship, setFilterVoivodeship] = useState<string>('all');
+  const [filterDateRange, setFilterDateRange] = useState<'all' | 'week' | 'month' | '3months'>('all');
+  const [filterPaymentStatus, setFilterPaymentStatus] = useState<'all' | 'paid' | 'unpaid'>('all');
+  const [showFilters, setShowFilters] = useState(false);
+
   // State for Payment Modal
   const [paymentModalPatient, setPaymentModalPatient] = useState<Patient | null>(null);
   const [paymentAmountPaid, setPaymentAmountPaid] = useState<number>(0);
 
-  // Filter Logic: Package + Search
+  // Get unique voivodeships from patients
+  const uniqueVoivodeships = useMemo(() => {
+    const voivodeships = [...new Set(patients.map(p => p.voivodeship).filter(Boolean))];
+    return voivodeships.sort();
+  }, [patients]);
+
+  // Date filter helper
+  const isWithinDateRange = (dateStr: string, range: string): boolean => {
+    if (range === 'all' || !dateStr) return true;
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+
+    switch (range) {
+      case 'week': return diffDays <= 7;
+      case 'month': return diffDays <= 30;
+      case '3months': return diffDays <= 90;
+      default: return true;
+    }
+  };
+
+  // Filter Logic: Package + Search + Voivodeship + Date + Payment Status
   const filteredPatients = patients.filter(p => {
     const matchesPackage = filterPackage === 'all' || p.package === filterPackage;
     const searchLower = searchQuery.toLowerCase();
-    const matchesSearch = p.firstName.toLowerCase().includes(searchLower) || 
+    const matchesSearch = p.firstName.toLowerCase().includes(searchLower) ||
                           p.lastName.toLowerCase().includes(searchLower) ||
                           p.pesel.includes(searchLower);
-    return matchesPackage && matchesSearch;
+    const matchesVoivodeship = filterVoivodeship === 'all' || p.voivodeship === filterVoivodeship;
+    const matchesDateRange = isWithinDateRange(p.applicationDate, filterDateRange);
+    const amountDue = getAmountDue(p);
+    const matchesPayment = filterPaymentStatus === 'all' ||
+                           (filterPaymentStatus === 'paid' && amountDue <= 0) ||
+                           (filterPaymentStatus === 'unpaid' && amountDue > 0);
+
+    return matchesPackage && matchesSearch && matchesVoivodeship && matchesDateRange && matchesPayment;
   });
+
+  // Count active filters
+  const activeFiltersCount = [
+    filterVoivodeship !== 'all',
+    filterDateRange !== 'all',
+    filterPaymentStatus !== 'all'
+  ].filter(Boolean).length;
 
   const getWhatsAppLink = (phone: string) => {
     const cleanNumber = phone.replace(/[^0-9]/g, '');
@@ -185,9 +226,27 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
           ))}
         </div>
 
+        {/* Filter Toggle Button */}
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            showFilters || activeFiltersCount > 0
+              ? 'bg-teal-100 text-teal-700'
+              : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          <Filter className="w-4 h-4" />
+          Filtry
+          {activeFiltersCount > 0 && (
+            <span className="bg-teal-600 text-white text-xs px-1.5 py-0.5 rounded-full">
+              {activeFiltersCount}
+            </span>
+          )}
+        </button>
+
         {/* PDF Download Button */}
         <div className="hidden md:block">
-            <button 
+            <button
               onClick={() => generateRegulations()}
               className="flex items-center gap-2 text-sm text-teal-700 hover:text-teal-800 font-medium px-3 py-1.5 rounded hover:bg-teal-50 transition-colors"
             >
@@ -196,6 +255,79 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
             </button>
         </div>
       </div>
+
+      {/* Expanded Filters Panel */}
+      {showFilters && (
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-wrap gap-4 items-end">
+          {/* Voivodeship Filter */}
+          <div className="flex-1 min-w-[180px]">
+            <label className="flex items-center gap-1 text-xs font-semibold text-gray-600 uppercase mb-1.5">
+              <MapPin className="w-3 h-3" />
+              Województwo
+            </label>
+            <select
+              value={filterVoivodeship}
+              onChange={(e) => setFilterVoivodeship(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white text-gray-900 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+            >
+              <option value="all">Wszystkie</option>
+              {uniqueVoivodeships.map((v) => (
+                <option key={v} value={v}>{v}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Date Range Filter */}
+          <div className="flex-1 min-w-[180px]">
+            <label className="flex items-center gap-1 text-xs font-semibold text-gray-600 uppercase mb-1.5">
+              <Calendar className="w-3 h-3" />
+              Data zgłoszenia
+            </label>
+            <select
+              value={filterDateRange}
+              onChange={(e) => setFilterDateRange(e.target.value as 'all' | 'week' | 'month' | '3months')}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white text-gray-900 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+            >
+              <option value="all">Wszystkie</option>
+              <option value="week">Ostatni tydzień</option>
+              <option value="month">Ostatni miesiąc</option>
+              <option value="3months">Ostatnie 3 miesiące</option>
+            </select>
+          </div>
+
+          {/* Payment Status Filter */}
+          <div className="flex-1 min-w-[180px]">
+            <label className="flex items-center gap-1 text-xs font-semibold text-gray-600 uppercase mb-1.5">
+              <CreditCard className="w-3 h-3" />
+              Status płatności
+            </label>
+            <select
+              value={filterPaymentStatus}
+              onChange={(e) => setFilterPaymentStatus(e.target.value as 'all' | 'paid' | 'unpaid')}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white text-gray-900 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+            >
+              <option value="all">Wszystkie</option>
+              <option value="paid">Opłacone</option>
+              <option value="unpaid">Nieopłacone</option>
+            </select>
+          </div>
+
+          {/* Clear Filters Button */}
+          {activeFiltersCount > 0 && (
+            <button
+              onClick={() => {
+                setFilterVoivodeship('all');
+                setFilterDateRange('all');
+                setFilterPaymentStatus('all');
+              }}
+              className="flex items-center gap-1 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            >
+              <X className="w-4 h-4" />
+              Wyczyść filtry
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         {/* Mobile only header for PDF button */}
