@@ -88,7 +88,7 @@ const App: React.FC = () => {
   const handleAddPatient = async (patientData: Patient) => {
     try {
       const { id, ...dataToSave } = patientData;
-      await addDoc(collection(db, "patients"), dataToSave);
+      const docRef = await addDoc(collection(db, "patients"), dataToSave);
 
       // Wyślij mail powitalny przez GetResponse
       sendWelcomeEmail({
@@ -98,6 +98,36 @@ const App: React.FC = () => {
         package: patientData.package,
         phone: patientData.phone
       });
+
+      // Dla Pakietu 3 - utwórz pacjenta w systemie rezerwacji MyWayPoint
+      if (patientData.package === '3') {
+        try {
+          const response = await fetch(
+            'https://europe-west1-myway-point-app.cloudfunctions.net/createPatientFromCRM',
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                firstName: patientData.firstName,
+                lastName: patientData.lastName,
+                email: patientData.email,
+                phone: patientData.phone,
+                totalSessions: 20,
+                crmPatientId: docRef.id
+              })
+            }
+          );
+
+          if (!response.ok) {
+            console.error('MyWayPoint sync error:', await response.text());
+          } else {
+            console.log('Pacjent zsynchronizowany z MyWayPoint');
+          }
+        } catch (syncError) {
+          // Log but don't block - patient was saved to CRM
+          console.error('MyWayPoint sync failed:', syncError);
+        }
+      }
 
       setActiveTab('list');
     } catch (err) {
