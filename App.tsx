@@ -90,6 +90,23 @@ const App: React.FC = () => {
       const { id, ...dataToSave } = patientData;
       const docRef = await addDoc(collection(db, "patients"), dataToSave);
 
+      // Wyślij powiadomienie o nowym pacjencie
+      try {
+        await fetch('https://europe-west1-myway-point-app.cloudfunctions.net/notifyNewPatient', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            firstName: patientData.firstName,
+            lastName: patientData.lastName,
+            email: patientData.email,
+            phone: patientData.phone,
+            package: patientData.package
+          })
+        });
+      } catch (notifyError) {
+        console.warn('⚠️ Nie udało się wysłać powiadomienia:', notifyError);
+      }
+
       // Wyślij mail powitalny przez GetResponse
       const emailSent = await sendWelcomeEmail({
         email: patientData.email,

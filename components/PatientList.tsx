@@ -17,7 +17,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
 
   // New filters
   const [filterVoivodeship, setFilterVoivodeship] = useState<string>('all');
-  const [filterDateRange, setFilterDateRange] = useState<'all' | 'week' | 'month' | '3months'>('all');
+  const [filterDateRange, setFilterDateRange] = useState<'all' | 'day' | 'week' | 'prevweek' | 'month' | '3months'>('all');
   const [filterPaymentStatus, setFilterPaymentStatus] = useState<'all' | 'paid' | 'unpaid'>('all');
   const [showFilters, setShowFilters] = useState(false);
 
@@ -39,7 +39,9 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
     const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
 
     switch (range) {
+      case 'day': return diffDays <= 1;
       case 'week': return diffDays <= 7;
+      case 'prevweek': return diffDays > 7 && diffDays <= 14;
       case 'month': return diffDays <= 30;
       case '3months': return diffDays <= 90;
       default: return true;
@@ -285,11 +287,13 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
             </label>
             <select
               value={filterDateRange}
-              onChange={(e) => setFilterDateRange(e.target.value as 'all' | 'week' | 'month' | '3months')}
+              onChange={(e) => setFilterDateRange(e.target.value as 'all' | 'day' | 'week' | 'prevweek' | 'month' | '3months')}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white text-gray-900 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
             >
               <option value="all">Wszystkie</option>
+              <option value="day">Ostatni dzień</option>
               <option value="week">Ostatni tydzień</option>
+              <option value="prevweek">Przedostatni tydzień</option>
               <option value="month">Ostatni miesiąc</option>
               <option value="3months">Ostatnie 3 miesiące</option>
             </select>

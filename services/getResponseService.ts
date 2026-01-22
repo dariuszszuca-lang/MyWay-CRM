@@ -1,8 +1,7 @@
 // GetResponse Integration Service
-// Wysyła mail powitalny do nowych pacjentów MyWay
+// Wysyła mail powitalny do nowych pacjentów MyWay przez Cloud Function
 
-const GETRESPONSE_API_KEY = '9ax00x1rt3wdfv36xcqoshr8t50fwhtk';
-const CAMPAIGN_ID_PACJENCI = 'LGv86'; // Lista: 10. MY WAY PACJENCI
+const CLOUD_FUNCTION_URL = 'https://europe-west1-myway-point-app.cloudfunctions.net/sendWelcomeEmailToPatient';
 
 interface PatientEmailData {
   email: string;
@@ -14,47 +13,28 @@ interface PatientEmailData {
 
 export const sendWelcomeEmail = async (patient: PatientEmailData): Promise<boolean> => {
   try {
-    // Dodaj kontakt do listy MY WAY PACJENCI
-    const response = await fetch('https://api.getresponse.com/v3/contacts', {
+    const response = await fetch(CLOUD_FUNCTION_URL, {
       method: 'POST',
       headers: {
-        'X-Auth-Token': `api-key ${GETRESPONSE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         email: patient.email,
-        name: `${patient.firstName} ${patient.lastName}`,
-        campaign: {
-          campaignId: CAMPAIGN_ID_PACJENCI
-        },
-        dayOfCycle: 0, // Trigger autoresponder immediately
-        customFieldValues: [
-          {
-            customFieldId: 'naIkxY', // pakiet
-            value: [patient.package]
-          },
-          ...(patient.phone ? [{
-            customFieldId: 'naIF5S', // telefon
-            value: [patient.phone]
-          }] : [])
-        ]
+        firstName: patient.firstName,
+        lastName: patient.lastName,
+        package: patient.package,
+        phone: patient.phone || ''
       }),
     });
 
-    if (response.ok || response.status === 202) {
-      console.log('✅ Pacjent dodany do GetResponse, mail powitalny zostanie wysłany');
+    const result = await response.json();
+
+    if (result.success) {
+      console.log('✅ Pacjent dodany do GetResponse:', result.message);
       return true;
     }
 
-    const errorData = await response.json();
-
-    // Kontakt już istnieje - to OK
-    if (errorData.code === 1008) {
-      console.log('ℹ️ Pacjent już istnieje w GetResponse');
-      return true;
-    }
-
-    console.error('❌ GetResponse error:', errorData);
+    console.error('❌ GetResponse error:', result.error);
     return false;
 
   } catch (error) {
