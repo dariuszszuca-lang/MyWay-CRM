@@ -1,7 +1,7 @@
 // GetResponse Integration Service
 // Wysyła mail powitalny do nowych pacjentów MyWay
 
-const GETRESPONSE_API_KEY = 'eltdu2kb2808bjsxsij4xu75hdu70rze';
+const GETRESPONSE_API_KEY = '9ax00x1rt3wdfv36xcqoshr8t50fwhtk';
 const CAMPAIGN_ID_PACJENCI = 'LGv86'; // Lista: 10. MY WAY PACJENCI
 
 interface PatientEmailData {
