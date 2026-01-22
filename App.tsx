@@ -91,13 +91,17 @@ const App: React.FC = () => {
       const docRef = await addDoc(collection(db, "patients"), dataToSave);
 
       // Wyślij mail powitalny przez GetResponse
-      sendWelcomeEmail({
+      const emailSent = await sendWelcomeEmail({
         email: patientData.email,
         firstName: patientData.firstName,
         lastName: patientData.lastName,
         package: patientData.package,
         phone: patientData.phone
       });
+
+      if (!emailSent) {
+        console.warn('⚠️ Nie udało się dodać pacjenta do GetResponse');
+      }
 
       // Dla Pakietu 3 - utwórz pacjenta w systemie rezerwacji MyWayPoint
       if (patientData.package === '3') {
