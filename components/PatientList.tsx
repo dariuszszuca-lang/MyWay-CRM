@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Patient, formatCurrency, getAmountDue } from '../types';
-import { FileText, User, ScrollText, MessageCircle, CheckSquare, Square, Pencil, Trash2, Search, Wallet, X, CheckCircle, MapPin, Calendar, Filter, CreditCard } from 'lucide-react';
+import { FileText, User, ScrollText, MessageCircle, CheckSquare, Square, Pencil, Trash2, Search, Wallet, X, CheckCircle, MapPin, Calendar, CreditCard } from 'lucide-react';
 import { generateContract, generatePatientCard, generateRegulations } from '../services/pdfGenerator';
 import PatientForm from './PatientForm';
 
@@ -19,7 +19,6 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
   const [filterVoivodeship, setFilterVoivodeship] = useState<string>('all');
   const [filterDateRange, setFilterDateRange] = useState<'all' | 'day' | 'week' | 'prevweek' | 'month' | '3months'>('all');
   const [filterPaymentStatus, setFilterPaymentStatus] = useState<'all' | 'paid' | 'unpaid'>('all');
-  const [showFilters, setShowFilters] = useState(false);
 
   // State for Payment Modal
   const [paymentModalPatient, setPaymentModalPatient] = useState<Patient | null>(null);
@@ -67,6 +66,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
 
   // Count active filters
   const activeFiltersCount = [
+    filterPackage !== 'all',
     filterVoivodeship !== 'all',
     filterDateRange !== 'all',
     filterPaymentStatus !== 'all'
@@ -195,82 +195,137 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
       )}
 
       {/* Top Bar: Search & Filters */}
-      <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-white p-3 rounded-xl shadow-sm border border-gray-100">
-        
-        {/* Search Bar */}
-        <div className="relative w-full md:w-64">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search className="h-4 w-4 text-gray-400" />
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 space-y-4">
+
+        {/* Row 1: Search + PDF */}
+        <div className="flex flex-col sm:flex-row gap-3 justify-between items-center">
+          {/* Search Bar */}
+          <div className="relative w-full sm:w-72">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-4 w-4 text-gray-400" />
+            </div>
+            <input
+              type="text"
+              placeholder="Szukaj pacjenta..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="block w-full pl-10 pr-3 py-2 border border-gray-200 rounded-lg leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 sm:text-sm transition duration-150 ease-in-out text-black"
+            />
           </div>
-          <input
-            type="text"
-            placeholder="Szukaj pacjenta..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="block w-full pl-10 pr-3 py-2 border border-gray-200 rounded-lg leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 sm:text-sm transition duration-150 ease-in-out text-black"
-          />
+
+          {/* PDF Download Button */}
+          <button
+            onClick={() => generateRegulations()}
+            className="hidden sm:flex items-center gap-2 text-sm text-teal-700 hover:text-teal-800 font-medium px-3 py-1.5 rounded hover:bg-teal-50 transition-colors"
+          >
+            <ScrollText className="w-4 h-4" />
+            Regulamin (PDF)
+          </button>
         </div>
 
-        {/* Package Tabs */}
-        <div className="flex gap-2 overflow-x-auto w-full md:w-auto">
-          {(['all', '1', '2', '3'] as const).map((pkg) => (
-            <button
-              key={pkg}
-              onClick={() => setFilterPackage(pkg)}
-              className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-colors whitespace-nowrap ${
-                filterPackage === pkg 
-                  ? 'bg-teal-600 text-white shadow-sm' 
-                  : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              {pkg === 'all' ? 'Wszyscy' : `Pakiet ${pkg}`}
-            </button>
-          ))}
-        </div>
+        {/* Row 2: All Filters */}
+        <div className="flex flex-wrap gap-x-6 gap-y-3 items-center">
 
-        {/* Filter Toggle Button */}
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-            showFilters || activeFiltersCount > 0
-              ? 'bg-teal-100 text-teal-700'
-              : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-          }`}
-        >
-          <Filter className="w-4 h-4" />
-          Filtry
-          {activeFiltersCount > 0 && (
-            <span className="bg-teal-600 text-white text-xs px-1.5 py-0.5 rounded-full">
-              {activeFiltersCount}
+          {/* Package Filter */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-gray-500 uppercase">Pakiet:</span>
+            <div className="flex gap-1">
+              {(['all', '1', '2', '3'] as const).map((pkg) => (
+                <button
+                  key={pkg}
+                  onClick={() => setFilterPackage(pkg)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-colors whitespace-nowrap ${
+                    filterPackage === pkg
+                      ? 'bg-teal-600 text-white shadow-sm'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {pkg === 'all' ? 'Wszyscy' : pkg}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="hidden md:block w-px h-6 bg-gray-200"></div>
+
+          {/* Payment Status Filter */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-gray-500 uppercase flex items-center gap-1">
+              <CreditCard className="w-3 h-3" />
+              Płatność:
             </span>
-          )}
-        </button>
+            <div className="flex gap-1">
+              {([
+                { value: 'all', label: 'Wszystkie' },
+                { value: 'paid', label: 'Opłacone' },
+                { value: 'unpaid', label: 'Nieopłacone' }
+              ] as const).map((item) => (
+                <button
+                  key={item.value}
+                  onClick={() => setFilterPaymentStatus(item.value)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                    filterPaymentStatus === item.value
+                      ? item.value === 'paid' ? 'bg-green-600 text-white shadow-sm'
+                        : item.value === 'unpaid' ? 'bg-red-500 text-white shadow-sm'
+                        : 'bg-teal-600 text-white shadow-sm'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
-        {/* PDF Download Button */}
-        <div className="hidden md:block">
-            <button
-              onClick={() => generateRegulations()}
-              className="flex items-center gap-2 text-sm text-teal-700 hover:text-teal-800 font-medium px-3 py-1.5 rounded hover:bg-teal-50 transition-colors"
-            >
-              <ScrollText className="w-4 h-4" />
-              Regulamin (PDF)
-            </button>
-        </div>
-      </div>
+          {/* Divider */}
+          <div className="hidden md:block w-px h-6 bg-gray-200"></div>
 
-      {/* Expanded Filters Panel */}
-      {showFilters && (
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-wrap gap-4 items-end">
+          {/* Date Range Filter */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-gray-500 uppercase flex items-center gap-1">
+              <Calendar className="w-3 h-3" />
+              Okres:
+            </span>
+            <div className="flex gap-1 flex-wrap">
+              {([
+                { value: 'all', label: 'Wszystkie' },
+                { value: 'day', label: 'Dziś' },
+                { value: 'week', label: '7 dni' },
+                { value: 'month', label: '30 dni' }
+              ] as const).map((item) => (
+                <button
+                  key={item.value}
+                  onClick={() => setFilterDateRange(item.value)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                    filterDateRange === item.value
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="hidden md:block w-px h-6 bg-gray-200"></div>
+
           {/* Voivodeship Filter */}
-          <div className="flex-1 min-w-[180px]">
-            <label className="flex items-center gap-1 text-xs font-semibold text-gray-600 uppercase mb-1.5">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-gray-500 uppercase flex items-center gap-1">
               <MapPin className="w-3 h-3" />
-              Województwo
-            </label>
+              Region:
+            </span>
             <select
               value={filterVoivodeship}
               onChange={(e) => setFilterVoivodeship(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white text-gray-900 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer outline-none ${
+                filterVoivodeship !== 'all'
+                  ? 'bg-purple-600 text-white shadow-sm border-purple-600'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-gray-100'
+              } border`}
             >
               <option value="all">Wszystkie</option>
               {uniqueVoivodeships.map((v) => (
@@ -279,64 +334,31 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
             </select>
           </div>
 
-          {/* Date Range Filter */}
-          <div className="flex-1 min-w-[180px]">
-            <label className="flex items-center gap-1 text-xs font-semibold text-gray-600 uppercase mb-1.5">
-              <Calendar className="w-3 h-3" />
-              Data zgłoszenia
-            </label>
-            <select
-              value={filterDateRange}
-              onChange={(e) => setFilterDateRange(e.target.value as 'all' | 'day' | 'week' | 'prevweek' | 'month' | '3months')}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white text-gray-900 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
-            >
-              <option value="all">Wszystkie</option>
-              <option value="day">Ostatni dzień</option>
-              <option value="week">Ostatni tydzień</option>
-              <option value="prevweek">Przedostatni tydzień</option>
-              <option value="month">Ostatni miesiąc</option>
-              <option value="3months">Ostatnie 3 miesiące</option>
-            </select>
-          </div>
-
-          {/* Payment Status Filter */}
-          <div className="flex-1 min-w-[180px]">
-            <label className="flex items-center gap-1 text-xs font-semibold text-gray-600 uppercase mb-1.5">
-              <CreditCard className="w-3 h-3" />
-              Status płatności
-            </label>
-            <select
-              value={filterPaymentStatus}
-              onChange={(e) => setFilterPaymentStatus(e.target.value as 'all' | 'paid' | 'unpaid')}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white text-gray-900 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
-            >
-              <option value="all">Wszystkie</option>
-              <option value="paid">Opłacone</option>
-              <option value="unpaid">Nieopłacone</option>
-            </select>
-          </div>
-
-          {/* Clear Filters Button */}
+          {/* Clear All Filters */}
           {activeFiltersCount > 0 && (
-            <button
-              onClick={() => {
-                setFilterVoivodeship('all');
-                setFilterDateRange('all');
-                setFilterPaymentStatus('all');
-              }}
-              className="flex items-center gap-1 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-            >
-              <X className="w-4 h-4" />
-              Wyczyść filtry
-            </button>
+            <>
+              <div className="hidden md:block w-px h-6 bg-gray-200"></div>
+              <button
+                onClick={() => {
+                  setFilterPackage('all');
+                  setFilterVoivodeship('all');
+                  setFilterDateRange('all');
+                  setFilterPaymentStatus('all');
+                }}
+                className="flex items-center gap-1 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors font-medium"
+              >
+                <X className="w-4 h-4" />
+                Wyczyść
+              </button>
+            </>
           )}
         </div>
-      )}
+      </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         {/* Mobile only header for PDF button */}
-        <div className="md:hidden p-4 bg-gray-50 border-b border-gray-200 flex justify-end">
-            <button 
+        <div className="sm:hidden p-4 bg-gray-50 border-b border-gray-200 flex justify-end">
+            <button
               onClick={() => generateRegulations()}
               className="flex items-center gap-2 text-sm text-teal-700 hover:text-teal-800 font-medium px-3 py-1.5 rounded hover:bg-teal-100 transition-colors"
             >
