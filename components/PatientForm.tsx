@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Patient, formatCurrency } from '../types';
+import { Patient, QueuePatient, formatCurrency } from '../types';
 import { PlusCircle, Calculator, Save, X } from 'lucide-react';
 
 interface PatientFormProps {
   onSubmit: (patient: Patient) => void;
   initialData?: Patient;
   onCancel?: () => void;
+  prefillFromQueue?: QueuePatient;
 }
 
 const defaultPatient: Omit<Patient, 'id'> = {
@@ -31,7 +32,7 @@ const defaultPatient: Omit<Patient, 'id'> = {
   notes: ''
 };
 
-const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCancel }) => {
+const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCancel, prefillFromQueue }) => {
   const [formData, setFormData] = useState<Omit<Patient, 'id'> | Patient>(defaultPatient);
 
   useEffect(() => {
@@ -39,6 +40,24 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
       setFormData(initialData);
     }
   }, [initialData]);
+
+  // Pre-fill from queue patient data
+  useEffect(() => {
+    if (prefillFromQueue) {
+      setFormData(prev => ({
+        ...prev,
+        firstName: prefillFromQueue.firstName,
+        lastName: prefillFromQueue.lastName,
+        phone: prefillFromQueue.phone,
+        email: prefillFromQueue.email || '',
+        package: prefillFromQueue.package,
+        amountPaid: prefillFromQueue.depositAmount,
+        treatmentStartDate: prefillFromQueue.plannedStartDate || '',
+        treatmentEndDate: prefillFromQueue.plannedEndDate || '',
+        notes: prefillFromQueue.notes || '',
+      }));
+    }
+  }, [prefillFromQueue]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;

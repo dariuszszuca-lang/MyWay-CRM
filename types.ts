@@ -28,6 +28,23 @@ export interface Patient {
   notes: string;
 }
 
+// Queue (Kolejka) - patients waiting for admission
+export interface QueuePatient {
+  id: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  email: string;
+  package: '1' | '2' | '3';
+  depositAmount: number;     // Wpłacona zaliczka
+  depositDate: string;       // Data wpłaty zaliczki
+  plannedStartDate: string;  // Planowany termin OD
+  plannedEndDate: string;    // Planowany termin DO
+  notes: string;
+  createdAt: string;
+  status: 'waiting' | 'confirmed' | 'cancelled';
+}
+
 // Derived property for amount due
 export const getAmountDue = (patient: Patient): number => {
   return patient.totalAmount - patient.amountPaid;
