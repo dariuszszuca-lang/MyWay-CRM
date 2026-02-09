@@ -42,7 +42,7 @@ export interface QueuePatient {
   plannedEndDate: string;    // Planowany termin DO
   notes: string;
   createdAt: string;
-  status: 'waiting' | 'confirmed' | 'cancelled';
+  status: 'waiting' | 'confirmed' | 'cancelled' | 'noshow';
 }
 
 // Derived property for amount due

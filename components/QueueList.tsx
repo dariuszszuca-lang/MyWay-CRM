@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { QueuePatient, formatCurrency } from '../types';
-import { UserPlus, Pencil, XCircle, Phone, Mail, Calendar, Wallet, Clock, CheckCircle, AlertCircle, Search } from 'lucide-react';
+import { UserPlus, Pencil, XCircle, Phone, Mail, Calendar, Wallet, Clock, CheckCircle, AlertCircle, Search, UserX } from 'lucide-react';
 import QueueForm from './QueueForm';
 
 interface QueueListProps {
@@ -14,12 +14,13 @@ const statusConfig = {
   waiting: { label: 'Oczekuje', color: 'bg-amber-100 text-amber-800 border-amber-200', icon: Clock },
   confirmed: { label: 'Potwierdzony', color: 'bg-green-100 text-green-800 border-green-200', icon: CheckCircle },
   cancelled: { label: 'Anulowany', color: 'bg-red-100 text-red-800 border-red-200', icon: XCircle },
+  noshow: { label: 'Nie przyjechał', color: 'bg-orange-100 text-orange-800 border-orange-200', icon: UserX },
 };
 
 const QueueList: React.FC<QueueListProps> = ({ queue, onUpdateQueue, onDeleteQueue, onAdmitPatient }) => {
   const [editingPatient, setEditingPatient] = useState<QueuePatient | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'waiting' | 'confirmed' | 'cancelled'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'waiting' | 'confirmed' | 'cancelled' | 'noshow'>('all');
 
   const handleSaveEdit = (updated: QueuePatient) => {
     onUpdateQueue(updated);
@@ -49,9 +50,12 @@ const QueueList: React.FC<QueueListProps> = ({ queue, onUpdateQueue, onDeleteQue
       return matchesSearch && matchesStatus;
     })
     .sort((a, b) => {
-      // cancelled last, then by plannedStartDate
-      if (a.status === 'cancelled' && b.status !== 'cancelled') return 1;
-      if (b.status === 'cancelled' && a.status !== 'cancelled') return -1;
+      // cancelled/noshow last, then by plannedStartDate
+      const inactiveStatuses = ['cancelled', 'noshow'];
+      const aInactive = inactiveStatuses.includes(a.status);
+      const bInactive = inactiveStatuses.includes(b.status);
+      if (aInactive && !bInactive) return 1;
+      if (bInactive && !aInactive) return -1;
       return (a.plannedStartDate || '').localeCompare(b.plannedStartDate || '');
     });
 
@@ -108,7 +112,7 @@ const QueueList: React.FC<QueueListProps> = ({ queue, onUpdateQueue, onDeleteQue
           />
         </div>
         <div className="flex gap-1">
-          {(['all', 'waiting', 'confirmed', 'cancelled'] as const).map((s) => (
+          {(['all', 'waiting', 'confirmed', 'cancelled', 'noshow'] as const).map((s) => (
             <button
               key={s}
               onClick={() => setFilterStatus(s)}
@@ -117,6 +121,7 @@ const QueueList: React.FC<QueueListProps> = ({ queue, onUpdateQueue, onDeleteQue
                   ? s === 'waiting' ? 'bg-amber-600 text-white' :
                     s === 'confirmed' ? 'bg-green-600 text-white' :
                     s === 'cancelled' ? 'bg-red-500 text-white' :
+                    s === 'noshow' ? 'bg-orange-500 text-white' :
                     'bg-teal-600 text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
@@ -132,7 +137,7 @@ const QueueList: React.FC<QueueListProps> = ({ queue, onUpdateQueue, onDeleteQue
         {filtered.map((patient) => {
           const cfg = statusConfig[patient.status];
           const StatusIcon = cfg.icon;
-          const isCancelled = patient.status === 'cancelled';
+          const isCancelled = patient.status === 'cancelled' || patient.status === 'noshow';
 
           return (
             <div

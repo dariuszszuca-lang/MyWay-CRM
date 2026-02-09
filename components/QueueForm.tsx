@@ -121,6 +121,7 @@ const QueueForm: React.FC<QueueFormProps> = ({ onSubmit, initialData, onCancel }
                 <option value="waiting">Oczekuje</option>
                 <option value="confirmed">Potwierdzony</option>
                 <option value="cancelled">Anulowany</option>
+                <option value="noshow">Nie przyjechał</option>
               </select>
             </div>
           </div>
