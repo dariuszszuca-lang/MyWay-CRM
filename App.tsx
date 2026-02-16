@@ -289,6 +289,7 @@ const App: React.FC = () => {
         const result = await dischargePatientEmail({
           email: patient.email,
           firstName: patient.firstName,
+          package: patient.package as '1' | '2' | '3',
         });
         if (result) {
           alert(`✅ ${patient.firstName} wypisany. Mail pożegnalny wysłany.`);

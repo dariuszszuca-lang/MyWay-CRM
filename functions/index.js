@@ -202,7 +202,8 @@ function getWelcomeEmailPlain(firstName, packageType, startDate) {
   return `Cześć ${firstName}!\n\nPotwierdzamy Twój termin w Ośrodku My Way.\n\nWariant terapii: Pakiet ${packageType}\n${startDate ? `Data przyjazdu: ${startDate}\n` : ""}\nCo spakować:\n- Środki higieny osobistej\n- Ręcznik\n- Ubrania na min. 7 dni\n- Strój sportowy\n- Obuwie + klapki\n- Kurtka\n- Laptop i telefon\n- Dowód osobisty\n\nMasz pytania? Dzwoń: 731 395 295\n\nDo zobaczenia!\nEkipa My Way\nosrodek-myway.pl`;
 }
 
-function getFarewellEmailHtml(firstName) {
+function getFarewellEmailHtml(firstName, packageType) {
+  const isPackage3 = packageType === "3";
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
 <body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,Helvetica,sans-serif;">
@@ -227,7 +228,7 @@ function getFarewellEmailHtml(firstName) {
     <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:20px;margin:24px 0;">
       <h3 style="margin:0 0 12px;color:#7c3aed;font-size:16px;">🎯 Co mamy dla Ciebie dalej?</h3>
       <table style="font-size:14px;color:#555;line-height:2;">
-        <tr><td>💬 <strong>20 spotkań indywidualnych</strong> — online lub na miejscu</td></tr>
+        ${isPackage3 ? `<tr><td>💬 <strong>20 spotkań indywidualnych</strong> — online lub na miejscu</td></tr>` : ""}
         <tr><td>⭐ <strong>Grupa VIP z Krystianem Nagabą</strong> — dostęp w ramach pakietu</td></tr>
       </table>
     </div>
@@ -274,8 +275,9 @@ function getFarewellEmailHtml(firstName) {
 </body></html>`;
 }
 
-function getFarewellEmailPlain(firstName) {
-  return `Cześć ${firstName}!\n\nGratulacje — właśnie domykasz ważny rozdział!\n\nCo dalej:\n- 20 spotkań indywidualnych (online lub na miejscu)\n- Grupa VIP z Krystianem Nagabą\n\nZostań z nami:\n- Sobotnie zjazdy — co sobotę o 10:00 w ośrodku\n- Grupa na WhatsApp — nasza przestrzeń 24/7\n\nKsiążka: https://wygrajtrzezwezycie.pl\n\nGdyby działo się coś trudnego — dzwoń:\n536 598 821\n731 395 295\n\nŚciskamy!\nEkipa My Way\nosrodek-myway.pl`;
+function getFarewellEmailPlain(firstName, packageType) {
+  const isPackage3 = packageType === "3";
+  return `Cześć ${firstName}!\n\nGratulacje — właśnie domykasz ważny rozdział!\n\nCo dalej:\n${isPackage3 ? "- 20 spotkań indywidualnych (online lub na miejscu)\n" : ""}- Grupa VIP z Krystianem Nagabą\n\nZostań z nami:\n- Sobotnie zjazdy — co sobotę o 10:00 w ośrodku\n- Grupa na WhatsApp — nasza przestrzeń 24/7\n\nKsiążka: https://wygrajtrzezwezycie.pl\n\nGdyby działo się coś trudnego — dzwoń:\n536 598 821\n731 395 295\n\nŚciskamy!\nEkipa My Way\nosrodek-myway.pl`;
 }
 
 // =======================================================================
@@ -462,14 +464,14 @@ exports.onPatientDischarged = functions
     if (req.method !== "POST") { res.status(405).json({ success: false }); return; }
 
     try {
-      const { email, firstName } = req.body;
+      const { email, firstName, package: pkg } = req.body;
 
       if (!email || !firstName) {
         res.status(400).json({ success: false, error: "Missing email or firstName" });
         return;
       }
 
-      console.log(`🔵 Wypisanie: ${firstName} (${email})`);
+      console.log(`🔵 Wypisanie: ${firstName} (${email}), Pakiet ${pkg || "?"}`);
 
       // Znajdź kontakt
       const contactId = await findContactByEmail(email);
@@ -480,10 +482,10 @@ exports.onPatientDischarged = functions
         return;
       }
 
-      // Wyślij maila pożegnalnego
+      // Wyślij maila pożegnalnego (treść zależy od pakietu)
       const subject = `Gratulacje ${firstName}! To początek Twojej nowej drogi 👊`;
-      const html = getFarewellEmailHtml(firstName);
-      const plain = getFarewellEmailPlain(firstName);
+      const html = getFarewellEmailHtml(firstName, pkg);
+      const plain = getFarewellEmailPlain(firstName, pkg);
 
       const nlRes = await sendNewsletterToContact(contactId, ALL_CONTACTS_CAMPAIGN_ID, subject, html, plain);
       let emailSent = false;

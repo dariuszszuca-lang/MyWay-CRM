@@ -91,6 +91,7 @@ export const confirmPatientEmail = async (data: {
 export const dischargePatientEmail = async (data: {
   email: string;
   firstName: string;
+  package: '1' | '2' | '3';
 }): Promise<boolean> => {
   try {
     const response = await fetch(`${CF_BASE}/onPatientDischarged`, {
