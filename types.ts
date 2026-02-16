@@ -26,6 +26,9 @@ export interface Patient {
   hasWhatsapp: boolean;
   onlineConsultations: number;
   notes: string;
+
+  // Patient status
+  status?: 'active' | 'discharged';
 }
 
 // Queue (Kolejka) - patients waiting for admission

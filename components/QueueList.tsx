@@ -8,6 +8,7 @@ interface QueueListProps {
   onUpdateQueue: (patient: QueuePatient) => void;
   onDeleteQueue: (id: string) => void;
   onAdmitPatient: (patient: QueuePatient) => void;
+  onConfirmPatient: (patient: QueuePatient) => void;
 }
 
 const statusConfig = {
@@ -17,7 +18,7 @@ const statusConfig = {
   noshow: { label: 'Nie przyjechał', color: 'bg-orange-100 text-orange-800 border-orange-200', icon: UserX },
 };
 
-const QueueList: React.FC<QueueListProps> = ({ queue, onUpdateQueue, onDeleteQueue, onAdmitPatient }) => {
+const QueueList: React.FC<QueueListProps> = ({ queue, onUpdateQueue, onDeleteQueue, onAdmitPatient, onConfirmPatient }) => {
   const [editingPatient, setEditingPatient] = useState<QueuePatient | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'waiting' | 'confirmed' | 'cancelled' | 'noshow'>('all');
@@ -197,6 +198,16 @@ const QueueList: React.FC<QueueListProps> = ({ queue, onUpdateQueue, onDeleteQue
 
               {/* Actions */}
               <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex gap-2">
+                {patient.status === 'waiting' && (
+                  <button
+                    onClick={() => onConfirmPatient(patient)}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 transition-colors"
+                    title="Potwierdź termin → wysyła mail powitalny + dodaje do list"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    Potwierdź
+                  </button>
+                )}
                 {!isCancelled && (
                   <button
                     onClick={() => onAdmitPatient(patient)}

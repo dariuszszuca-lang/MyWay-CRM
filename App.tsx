@@ -9,7 +9,7 @@ import { Activity, Users, Download, Cloud, RefreshCw, LogOut, Clock } from 'luci
 import { db, auth } from './firebaseConfig';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { sendWelcomeEmail } from './services/getResponseService';
+import { sendWelcomeEmail, confirmPatientEmail, dischargePatientEmail } from './services/getResponseService';
 
 // --- KONFIGURACJA DOSTĘPU (BIAŁA LISTA) ---
 const ALLOWED_EMAILS = [
@@ -241,6 +241,69 @@ const App: React.FC = () => {
     }
   };
 
+  // Confirm patient in queue → send welcome email + add to GetResponse lists
+  const handleConfirmQueuePatient = async (patient: QueuePatient) => {
+    try {
+      // 1. Update status in Firestore
+      const ref = doc(db, "queue", patient.id);
+      await updateDoc(ref, { status: 'confirmed' });
+
+      // 2. Send welcome email + add to lists (if email exists)
+      if (patient.email) {
+        const result = await confirmPatientEmail({
+          email: patient.email,
+          firstName: patient.firstName,
+          lastName: patient.lastName,
+          package: patient.package,
+          phone: patient.phone,
+          startDate: patient.plannedStartDate,
+          endDate: patient.plannedEndDate,
+        });
+        if (result) {
+          alert(`✅ ${patient.firstName} potwierdzony! Mail powitalny wysłany + dodany do list GetResponse.`);
+        } else {
+          alert(`⚠️ ${patient.firstName} potwierdzony, ale wystąpił problem z mailem/listami.`);
+        }
+      } else {
+        alert(`✅ ${patient.firstName} potwierdzony (brak e-mail — mail nie wysłany).`);
+      }
+    } catch (err) {
+      alert("Błąd podczas potwierdzania pacjenta.");
+      console.error(err);
+    }
+  };
+
+  // Discharge patient → send farewell email
+  const handleDischargePatient = async (patient: Patient) => {
+    if (!window.confirm(`Czy na pewno chcesz wypisać ${patient.firstName} ${patient.lastName}? Zostanie wysłany mail pożegnalny.`)) {
+      return;
+    }
+
+    try {
+      // 1. Update status in Firestore
+      const patientRef = doc(db, "patients", patient.id);
+      await updateDoc(patientRef, { status: 'discharged' });
+
+      // 2. Send farewell email (if email exists)
+      if (patient.email) {
+        const result = await dischargePatientEmail({
+          email: patient.email,
+          firstName: patient.firstName,
+        });
+        if (result) {
+          alert(`✅ ${patient.firstName} wypisany. Mail pożegnalny wysłany.`);
+        } else {
+          alert(`⚠️ ${patient.firstName} wypisany, ale problem z wysyłką maila.`);
+        }
+      } else {
+        alert(`✅ ${patient.firstName} wypisany (brak e-mail — mail nie wysłany).`);
+      }
+    } catch (err) {
+      alert("Błąd podczas wypisywania pacjenta.");
+      console.error(err);
+    }
+  };
+
   // Admit patient: queue → form with prefill
   const handleAdmitPatient = (queuePatient: QueuePatient) => {
     setPrefillQueue(queuePatient);
@@ -432,6 +495,7 @@ const App: React.FC = () => {
                   patients={patients}
                   onUpdatePatient={handleUpdatePatient}
                   onDeletePatient={handleDeletePatient}
+                  onDischargePatient={handleDischargePatient}
                 />
               </div>
             )}
@@ -454,6 +518,7 @@ const App: React.FC = () => {
                   onUpdateQueue={handleUpdateQueue}
                   onDeleteQueue={handleDeleteQueue}
                   onAdmitPatient={handleAdmitPatient}
+                  onConfirmPatient={handleConfirmQueuePatient}
                 />
               </div>
             )}

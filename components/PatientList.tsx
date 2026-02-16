@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Patient, formatCurrency, getAmountDue } from '../types';
-import { FileText, User, ScrollText, MessageCircle, CheckSquare, Square, Pencil, Trash2, Search, Wallet, X, CheckCircle, MapPin, Calendar, CreditCard } from 'lucide-react';
+import { FileText, User, ScrollText, MessageCircle, CheckSquare, Square, Pencil, Trash2, Search, Wallet, X, CheckCircle, MapPin, Calendar, CreditCard, LogOut } from 'lucide-react';
 import { generateContract, generatePatientCard, generateRegulations } from '../services/pdfGenerator';
 import PatientForm from './PatientForm';
 
@@ -8,9 +8,10 @@ interface PatientListProps {
   patients: Patient[];
   onUpdatePatient: (patient: Patient) => void;
   onDeletePatient: (id: string) => void;
+  onDischargePatient: (patient: Patient) => void;
 }
 
-const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, onDeletePatient }) => {
+const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, onDeletePatient, onDischargePatient }) => {
   const [filterPackage, setFilterPackage] = useState<'all' | '1' | '2' | '3'>('all');
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -383,9 +384,17 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
               {filteredPatients.length > 0 ? filteredPatients.map((patient) => (
                 <tr key={patient.id} className="hover:bg-gray-50 group">
                   {/* Pacjent / Adres */}
-                  <td className="p-3 align-top">
+                  <td className={`p-3 align-top ${patient.status === 'discharged' ? 'opacity-50' : ''}`}>
                     <div className="flex items-start justify-between">
-                         <div className="font-bold text-gray-900 text-base">{patient.firstName} {patient.lastName}</div>
+                         <div>
+                           <span className="font-bold text-gray-900 text-base">{patient.firstName} {patient.lastName}</span>
+                           {patient.status === 'discharged' && (
+                             <span className="ml-2 inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                               <LogOut className="w-3 h-3" />
+                               Wypisany
+                             </span>
+                           )}
+                         </div>
                          <div className="flex gap-1 ml-2">
                             <button onClick={() => setEditingPatient(patient)} className="p-1 text-gray-400 hover:text-teal-600" title="Edytuj dane">
                                 <Pencil className="w-4 h-4" />
@@ -502,20 +511,30 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
 
                   {/* Dokumenty */}
                   <td className="p-3 align-top text-right space-y-2">
-                    <button 
+                    <button
                       onClick={() => generateContract(patient)}
                       className="w-full justify-center inline-flex items-center gap-1 px-3 py-1.5 border border-teal-600 text-teal-600 rounded hover:bg-teal-50 text-xs font-medium transition-colors"
                     >
                       <FileText className="w-3 h-3" />
                       Umowa
                     </button>
-                    <button 
+                    <button
                       onClick={() => generatePatientCard(patient)}
                       className="w-full justify-center inline-flex items-center gap-1 px-3 py-1.5 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 text-xs font-medium transition-colors"
                     >
                       <User className="w-3 h-3" />
                       Karta
                     </button>
+                    {patient.status !== 'discharged' && (
+                      <button
+                        onClick={() => onDischargePatient(patient)}
+                        className="w-full justify-center inline-flex items-center gap-1 px-3 py-1.5 border border-purple-400 text-purple-600 rounded hover:bg-purple-50 text-xs font-medium transition-colors"
+                        title="Wypisz pacjenta → wysyła mail pożegnalny"
+                      >
+                        <LogOut className="w-3 h-3" />
+                        Wypisz
+                      </button>
+                    )}
                   </td>
                 </tr>
               )) : (
