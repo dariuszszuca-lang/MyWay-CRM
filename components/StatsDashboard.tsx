@@ -10,7 +10,9 @@ interface StatsDashboardProps {
 const MONTH_NAMES = ['Sty', 'Lut', 'Mar', 'Kwi', 'Maj', 'Cze', 'Lip', 'Sie', 'Wrz', 'Paź', 'Lis', 'Gru'];
 
 const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
-  const [timePeriod, setTimePeriod] = useState<'all' | 'week' | 'month' | '3months' | 'year'>('all');
+  const [timePeriod, setTimePeriod] = useState<'all' | 'week' | 'month' | '3months' | 'year' | 'custom'>('all');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
   const [isExporting, setIsExporting] = useState(false);
 
   const timePeriodLabel = (period: string) => {
@@ -20,6 +22,7 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
       case 'month': return 'Miesiąc';
       case '3months': return '3 miesiące';
       case 'year': return 'Rok';
+      case 'custom': return customFrom && customTo ? `${customFrom} — ${customTo}` : 'Niestandardowy';
       default: return period;
     }
   };
@@ -27,6 +30,24 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
   // Filter patients by time period
   const filtered = useMemo(() => {
     if (timePeriod === 'all') return patients;
+    if (timePeriod === 'custom') {
+      if (!customFrom && !customTo) return patients;
+      return patients.filter(p => {
+        if (!p.applicationDate) return false;
+        const d = new Date(p.applicationDate);
+        if (customFrom) {
+          const from = new Date(customFrom);
+          from.setHours(0, 0, 0, 0);
+          if (d < from) return false;
+        }
+        if (customTo) {
+          const to = new Date(customTo);
+          to.setHours(23, 59, 59, 999);
+          if (d > to) return false;
+        }
+        return true;
+      });
+    }
     const now = new Date();
     return patients.filter(p => {
       if (!p.applicationDate) return false;
@@ -40,7 +61,7 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
         default: return true;
       }
     });
-  }, [patients, timePeriod]);
+  }, [patients, timePeriod, customFrom, customTo]);
 
   // KPIs
   const stats = useMemo(() => {
@@ -153,6 +174,7 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
               { value: 'month', label: 'Miesiąc' },
               { value: '3months', label: '3 miesiące' },
               { value: 'year', label: 'Rok' },
+              { value: 'custom', label: 'Niestandardowy' },
             ] as const).map(item => (
               <button
                 key={item.value}
@@ -166,6 +188,25 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
                 {item.label}
               </button>
             ))}
+            {timePeriod === 'custom' && (
+              <div className="flex items-center gap-2 ml-2">
+                <input
+                  type="date"
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  className="px-2 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Od"
+                />
+                <span className="text-gray-400 text-sm">—</span>
+                <input
+                  type="date"
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  className="px-2 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Do"
+                />
+              </div>
+            )}
           </div>
         </div>
         <button
