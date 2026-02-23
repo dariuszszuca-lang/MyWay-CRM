@@ -18,17 +18,28 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
 
   // New filters
   const [filterVoivodeship, setFilterVoivodeship] = useState<string>('all');
-  const [filterDateRange, setFilterDateRange] = useState<'all' | 'day' | 'week' | 'prevweek' | 'month' | '3months'>('all');
+  const [filterDateRange, setFilterDateRange] = useState<'all' | 'day' | 'week' | 'prevweek' | 'month' | '3months' | 'custom'>('all');
   const [filterPaymentStatus, setFilterPaymentStatus] = useState<'all' | 'paid' | 'unpaid'>('all');
+  const [customDateFrom, setCustomDateFrom] = useState<string>('');
+  const [customDateTo, setCustomDateTo] = useState<string>('');
 
   // State for Payment Modal
   const [paymentModalPatient, setPaymentModalPatient] = useState<Patient | null>(null);
   const [paymentAmountPaid, setPaymentAmountPaid] = useState<number>(0);
 
-  // Get unique voivodeships from patients
+  // Get unique voivodeships from patients (case-insensitive grouping)
   const uniqueVoivodeships = useMemo(() => {
-    const voivodeships = [...new Set(patients.map(p => p.voivodeship).filter(Boolean))];
-    return voivodeships.sort();
+    const seen = new Map<string, string>();
+    patients.forEach(p => {
+      if (p.voivodeship) {
+        const key = p.voivodeship.toLowerCase();
+        if (!seen.has(key)) {
+          // Capitalize first letter for display
+          seen.set(key, key.charAt(0).toUpperCase() + key.slice(1));
+        }
+      }
+    });
+    return [...seen.values()].sort((a, b) => a.localeCompare(b, 'pl'));
   }, [patients]);
 
   // Date filter helper
@@ -44,6 +55,22 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
       case 'prevweek': return diffDays > 7 && diffDays <= 14;
       case 'month': return diffDays <= 30;
       case '3months': return diffDays <= 90;
+      case 'custom': {
+        if (!customDateFrom && !customDateTo) return true;
+        const d = new Date(dateStr);
+        d.setHours(0, 0, 0, 0);
+        if (customDateFrom) {
+          const from = new Date(customDateFrom);
+          from.setHours(0, 0, 0, 0);
+          if (d < from) return false;
+        }
+        if (customDateTo) {
+          const to = new Date(customDateTo);
+          to.setHours(23, 59, 59, 999);
+          if (d > to) return false;
+        }
+        return true;
+      }
       default: return true;
     }
   };
@@ -55,7 +82,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
     const matchesSearch = p.firstName.toLowerCase().includes(searchLower) ||
                           p.lastName.toLowerCase().includes(searchLower) ||
                           p.pesel.includes(searchLower);
-    const matchesVoivodeship = filterVoivodeship === 'all' || p.voivodeship === filterVoivodeship;
+    const matchesVoivodeship = filterVoivodeship === 'all' || (p.voivodeship || '').toLowerCase() === filterVoivodeship.toLowerCase();
     const matchesDateRange = isWithinDateRange(p.applicationDate, filterDateRange);
     const amountDue = getAmountDue(p);
     const matchesPayment = filterPaymentStatus === 'all' ||
@@ -288,12 +315,13 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
               <Calendar className="w-3 h-3" />
               Okres:
             </span>
-            <div className="flex gap-1 flex-wrap">
+            <div className="flex gap-1 flex-wrap items-center">
               {([
                 { value: 'all', label: 'Wszystkie' },
                 { value: 'day', label: 'Dziś' },
                 { value: 'week', label: '7 dni' },
-                { value: 'month', label: '30 dni' }
+                { value: 'month', label: '30 dni' },
+                { value: 'custom', label: 'Niestandardowy' }
               ] as const).map((item) => (
                 <button
                   key={item.value}
@@ -307,6 +335,23 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                   {item.label}
                 </button>
               ))}
+              {filterDateRange === 'custom' && (
+                <div className="flex items-center gap-1 ml-1">
+                  <input
+                    type="date"
+                    value={customDateFrom}
+                    onChange={(e) => setCustomDateFrom(e.target.value)}
+                    className="px-2 py-1 rounded-lg text-sm border border-gray-300 bg-white text-gray-700 outline-none focus:border-blue-500"
+                  />
+                  <span className="text-xs text-gray-400">–</span>
+                  <input
+                    type="date"
+                    value={customDateTo}
+                    onChange={(e) => setCustomDateTo(e.target.value)}
+                    className="px-2 py-1 rounded-lg text-sm border border-gray-300 bg-white text-gray-700 outline-none focus:border-blue-500"
+                  />
+                </div>
+              )}
             </div>
           </div>
 
@@ -345,6 +390,8 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                   setFilterVoivodeship('all');
                   setFilterDateRange('all');
                   setFilterPaymentStatus('all');
+                  setCustomDateFrom('');
+                  setCustomDateTo('');
                 }}
                 className="flex items-center gap-1 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors font-medium"
               >
