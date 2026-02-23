@@ -27,19 +27,47 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
   const [paymentModalPatient, setPaymentModalPatient] = useState<Patient | null>(null);
   const [paymentAmountPaid, setPaymentAmountPaid] = useState<number>(0);
 
-  // Get unique voivodeships from patients (case-insensitive grouping)
+  // Normalize voivodeship names (typos, case, dashes)
+  const normalizeVoivodeship = (v: string): string | null => {
+    if (!v) return null;
+    const s = v.toLowerCase().trim().replace(/-/g, '');
+    const map: Record<string, string> = {
+      'dolnoslaskie': 'Dolnośląskie',
+      'dolnośląskie': 'Dolnośląskie',
+      'kujawskopomorskie': 'Kujawsko-pomorskie',
+      'kujawsko pomorskie': 'Kujawsko-pomorskie',
+      'lubelskie': 'Lubelskie',
+      'lubuskie': 'Lubuskie',
+      'lodzkie': 'Łódzkie',
+      'łodzkie': 'Łódzkie',
+      'łódzkie': 'Łódzkie',
+      'malopolskie': 'Małopolskie',
+      'małopolskie': 'Małopolskie',
+      'mazowieckie': 'Mazowieckie',
+      'opolskie': 'Opolskie',
+      'podkarpackie': 'Podkarpackie',
+      'podlaskie': 'Podlaskie',
+      'pomorskie': 'Pomorskie',
+      'slaskie': 'Śląskie',
+      'śląskie': 'Śląskie',
+      'swietokrzyskie': 'Świętokrzyskie',
+      'świętokrzyskie': 'Świętokrzyskie',
+      'warminskomazurskie': 'Warmińsko-mazurskie',
+      'warmińskomazurskie': 'Warmińsko-mazurskie',
+      'wielkopolskie': 'Wielkopolskie',
+      'zachodniopomorskie': 'Zachodniopomorskie',
+    };
+    return map[s] || null;
+  };
+
+  // Get unique voivodeships from patients (normalized, only valid Polish ones)
   const uniqueVoivodeships = useMemo(() => {
-    const seen = new Map<string, string>();
+    const normalized = new Set<string>();
     patients.forEach(p => {
-      if (p.voivodeship) {
-        const key = p.voivodeship.toLowerCase();
-        if (!seen.has(key)) {
-          // Capitalize first letter for display
-          seen.set(key, key.charAt(0).toUpperCase() + key.slice(1));
-        }
-      }
+      const n = normalizeVoivodeship(p.voivodeship);
+      if (n) normalized.add(n);
     });
-    return [...seen.values()].sort((a, b) => a.localeCompare(b, 'pl'));
+    return [...normalized].sort((a, b) => a.localeCompare(b, 'pl'));
   }, [patients]);
 
   // Date filter helper
@@ -82,7 +110,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
     const matchesSearch = p.firstName.toLowerCase().includes(searchLower) ||
                           p.lastName.toLowerCase().includes(searchLower) ||
                           p.pesel.includes(searchLower);
-    const matchesVoivodeship = filterVoivodeship === 'all' || (p.voivodeship || '').toLowerCase() === filterVoivodeship.toLowerCase();
+    const matchesVoivodeship = filterVoivodeship === 'all' || normalizeVoivodeship(p.voivodeship) === filterVoivodeship;
     const matchesDateRange = isWithinDateRange(p.applicationDate, filterDateRange);
     const amountDue = getAmountDue(p);
     const matchesPayment = filterPaymentStatus === 'all' ||
