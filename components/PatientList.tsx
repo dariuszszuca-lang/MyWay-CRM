@@ -57,10 +57,10 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
       'wielkopolskie': 'Wielkopolskie',
       'zachodniopomorskie': 'Zachodniopomorskie',
     };
-    return map[s] || null;
+    return map[s] || 'Zagranica';
   };
 
-  // Get unique voivodeships from patients (normalized, only valid Polish ones)
+  // Get unique voivodeships from patients (normalized, foreign → "Zagranica")
   const uniqueVoivodeships = useMemo(() => {
     const normalized = new Set<string>();
     patients.forEach(p => {
