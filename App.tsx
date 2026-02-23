@@ -5,7 +5,8 @@ import PatientList from './components/PatientList';
 import QueueForm from './components/QueueForm';
 import QueueList from './components/QueueList';
 import Login from './components/Login';
-import { Activity, Users, Download, Cloud, RefreshCw, LogOut, Clock } from 'lucide-react';
+import StatsDashboard from './components/StatsDashboard';
+import { Activity, Users, Download, Cloud, RefreshCw, LogOut, Clock, BarChart3 } from 'lucide-react';
 import { db, auth } from './firebaseConfig';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
@@ -27,7 +28,7 @@ const App: React.FC = () => {
 
   const [patients, setPatients] = useState<Patient[]>([]);
   const [queue, setQueue] = useState<QueuePatient[]>([]);
-  const [activeTab, setActiveTab] = useState<'form' | 'list' | 'queue'>('form');
+  const [activeTab, setActiveTab] = useState<'form' | 'list' | 'queue' | 'stats'>('form');
   const [dataLoading, setDataLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -332,7 +333,7 @@ const App: React.FC = () => {
   };
 
   // Cancel prefill when switching away from form
-  const switchTab = (tab: 'form' | 'list' | 'queue') => {
+  const switchTab = (tab: 'form' | 'list' | 'queue' | 'stats') => {
     if (tab !== 'form') {
       setPrefillQueue(null);
       setAdmittingQueueId(null);
@@ -422,6 +423,18 @@ const App: React.FC = () => {
                     {queueWaitingCount}
                   </span>
                 )}
+              </button>
+
+              <button
+                onClick={() => switchTab('stats')}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
+                  activeTab === 'stats'
+                    ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <BarChart3 className="w-4 h-4" />
+                Statystyki
               </button>
 
               <button
@@ -521,6 +534,12 @@ const App: React.FC = () => {
                   onAdmitPatient={handleAdmitPatient}
                   onConfirmPatient={handleConfirmQueuePatient}
                 />
+              </div>
+            )}
+
+            {activeTab === 'stats' && (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <StatsDashboard patients={patients} />
               </div>
             )}
           </>

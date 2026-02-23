@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { Patient, formatCurrency, getAmountDue } from '../types';
-import { FileText, User, ScrollText, MessageCircle, CheckSquare, Square, Pencil, Trash2, Search, Wallet, X, CheckCircle, MapPin, Calendar, CreditCard, LogOut } from 'lucide-react';
-import { generateContract, generatePatientCard, generateRegulations } from '../services/pdfGenerator';
+import { Patient, formatCurrency, getAmountDue, normalizeVoivodeship } from '../types';
+import { FileText, User, ScrollText, MessageCircle, CheckSquare, Square, Pencil, Trash2, Search, Wallet, X, CheckCircle, MapPin, Calendar, CreditCard, LogOut, Download } from 'lucide-react';
+import { generateContract, generatePatientCard, generateRegulations, generateFilteredListPDF } from '../services/pdfGenerator';
 import PatientForm from './PatientForm';
 
 interface PatientListProps {
@@ -26,39 +26,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
   // State for Payment Modal
   const [paymentModalPatient, setPaymentModalPatient] = useState<Patient | null>(null);
   const [paymentAmountPaid, setPaymentAmountPaid] = useState<number>(0);
-
-  // Normalize voivodeship names (typos, case, dashes)
-  const normalizeVoivodeship = (v: string): string | null => {
-    if (!v) return null;
-    const s = v.toLowerCase().trim().replace(/-/g, '');
-    const map: Record<string, string> = {
-      'dolnoslaskie': 'Dolnośląskie',
-      'dolnośląskie': 'Dolnośląskie',
-      'kujawskopomorskie': 'Kujawsko-pomorskie',
-      'kujawsko pomorskie': 'Kujawsko-pomorskie',
-      'lubelskie': 'Lubelskie',
-      'lubuskie': 'Lubuskie',
-      'lodzkie': 'Łódzkie',
-      'łodzkie': 'Łódzkie',
-      'łódzkie': 'Łódzkie',
-      'malopolskie': 'Małopolskie',
-      'małopolskie': 'Małopolskie',
-      'mazowieckie': 'Mazowieckie',
-      'opolskie': 'Opolskie',
-      'podkarpackie': 'Podkarpackie',
-      'podlaskie': 'Podlaskie',
-      'pomorskie': 'Pomorskie',
-      'slaskie': 'Śląskie',
-      'śląskie': 'Śląskie',
-      'swietokrzyskie': 'Świętokrzyskie',
-      'świętokrzyskie': 'Świętokrzyskie',
-      'warminskomazurskie': 'Warmińsko-mazurskie',
-      'warmińskomazurskie': 'Warmińsko-mazurskie',
-      'wielkopolskie': 'Wielkopolskie',
-      'zachodniopomorskie': 'Zachodniopomorskie',
-    };
-    return map[s] || 'Zagranica';
-  };
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
 
   // Get unique voivodeships from patients (normalized, foreign → "Zagranica")
   const uniqueVoivodeships = useMemo(() => {
@@ -157,6 +125,34 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
   const handlePayInFull = () => {
     if (paymentModalPatient) {
       setPaymentAmountPaid(paymentModalPatient.totalAmount);
+    }
+  };
+
+  const handleExportFilteredPDF = async () => {
+    setIsExportingPDF(true);
+    try {
+      const filterParts: string[] = [];
+      if (filterPackage !== 'all') filterParts.push(`Pakiet ${filterPackage}`);
+      if (filterPaymentStatus === 'paid') filterParts.push('Opłacone');
+      if (filterPaymentStatus === 'unpaid') filterParts.push('Nieopłacone');
+      if (filterVoivodeship !== 'all') filterParts.push(filterVoivodeship);
+      if (filterDateRange === 'day') filterParts.push('Dziś');
+      if (filterDateRange === 'week') filterParts.push('Ostatnie 7 dni');
+      if (filterDateRange === 'month') filterParts.push('Ostatnie 30 dni');
+      if (filterDateRange === 'custom') {
+        filterParts.push(`${customDateFrom || '...'} – ${customDateTo || '...'}`);
+      }
+      if (searchQuery) filterParts.push(`Szukaj: "${searchQuery}"`);
+
+      await generateFilteredListPDF({
+        patients: filteredPatients,
+        filterDescription: filterParts.length > 0 ? filterParts.join(' | ') : 'Brak (wszystkie dane)',
+      });
+    } catch (err) {
+      console.error('PDF export error:', err);
+      alert('Błąd podczas generowania PDF.');
+    } finally {
+      setIsExportingPDF(false);
     }
   };
 
@@ -269,14 +265,23 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
             />
           </div>
 
-          {/* PDF Download Button */}
-          <button
-            onClick={() => generateRegulations()}
-            className="hidden sm:flex items-center gap-2 text-sm text-teal-700 hover:text-teal-800 font-medium px-3 py-1.5 rounded hover:bg-teal-50 transition-colors"
-          >
-            <ScrollText className="w-4 h-4" />
-            Regulamin (PDF)
-          </button>
+          <div className="hidden sm:flex items-center gap-2">
+            <button
+              onClick={handleExportFilteredPDF}
+              disabled={isExportingPDF || filteredPatients.length === 0}
+              className="flex items-center gap-2 text-sm text-white bg-teal-600 hover:bg-teal-700 font-medium px-4 py-1.5 rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Download className="w-4 h-4" />
+              {isExportingPDF ? 'Generowanie...' : `Pobierz PDF (${filteredPatients.length})`}
+            </button>
+            <button
+              onClick={() => generateRegulations()}
+              className="flex items-center gap-2 text-sm text-teal-700 hover:text-teal-800 font-medium px-3 py-1.5 rounded hover:bg-teal-50 transition-colors"
+            >
+              <ScrollText className="w-4 h-4" />
+              Regulamin
+            </button>
+          </div>
         </div>
 
         {/* Row 2: All Filters */}

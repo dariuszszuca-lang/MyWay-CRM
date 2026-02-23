@@ -56,3 +56,36 @@ export const getAmountDue = (patient: Patient): number => {
 export const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' }).format(amount);
 };
+
+// Normalize voivodeship names (typos, case, dashes, foreign)
+export const normalizeVoivodeship = (v: string): string | null => {
+  if (!v) return null;
+  const s = v.toLowerCase().trim().replace(/-/g, '');
+  const map: Record<string, string> = {
+    'dolnoslaskie': 'Dolnośląskie',
+    'dolnośląskie': 'Dolnośląskie',
+    'kujawskopomorskie': 'Kujawsko-pomorskie',
+    'kujawsko pomorskie': 'Kujawsko-pomorskie',
+    'lubelskie': 'Lubelskie',
+    'lubuskie': 'Lubuskie',
+    'lodzkie': 'Łódzkie',
+    'łodzkie': 'Łódzkie',
+    'łódzkie': 'Łódzkie',
+    'malopolskie': 'Małopolskie',
+    'małopolskie': 'Małopolskie',
+    'mazowieckie': 'Mazowieckie',
+    'opolskie': 'Opolskie',
+    'podkarpackie': 'Podkarpackie',
+    'podlaskie': 'Podlaskie',
+    'pomorskie': 'Pomorskie',
+    'slaskie': 'Śląskie',
+    'śląskie': 'Śląskie',
+    'swietokrzyskie': 'Świętokrzyskie',
+    'świętokrzyskie': 'Świętokrzyskie',
+    'warminskomazurskie': 'Warmińsko-mazurskie',
+    'warmińskomazurskie': 'Warmińsko-mazurskie',
+    'wielkopolskie': 'Wielkopolskie',
+    'zachodniopomorskie': 'Zachodniopomorskie',
+  };
+  return map[s] || 'Zagranica';
+};

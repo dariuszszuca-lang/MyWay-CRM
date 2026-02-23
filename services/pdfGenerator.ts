@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Patient, getAmountDue, formatCurrency } from '../types';
+import { Patient, getAmountDue, formatCurrency, normalizeVoivodeship } from '../types';
 
 // URLs for fonts that support Polish characters (Roboto)
 const FONT_URL_REGULAR = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf';
@@ -467,4 +467,225 @@ export const generateRegulations = async () => {
     doc.text("2", 105, 285, { align: 'center' });
 
     doc.save("Regulamin_MyWay.pdf");
+};
+
+// --- FILTERED LIST PDF ---
+interface FilteredListPDFOptions {
+  patients: Patient[];
+  filterDescription: string;
+}
+
+export const generateFilteredListPDF = async (options: FilteredListPDFOptions) => {
+  const doc = new jsPDF('landscape');
+  await loadFonts(doc);
+
+  // Header
+  doc.setFontSize(16);
+  doc.setFont("Roboto", "bold");
+  doc.setTextColor(13, 148, 136);
+  doc.text("MyWay CRM", 14, 15);
+  doc.setFontSize(8);
+  doc.setTextColor(100);
+  doc.text("OŚRODEK LECZENIA UZALEŻNIEŃ", 14, 20);
+
+  doc.setTextColor(0);
+  doc.setFontSize(13);
+  doc.setFont("Roboto", "bold");
+  doc.text("Lista pacjentów — eksport", 148, 15, { align: 'center' });
+
+  doc.setFontSize(9);
+  doc.setFont("Roboto", "normal");
+  const today = new Date().toLocaleDateString('pl-PL');
+  doc.text(`Data eksportu: ${today}`, 282, 15, { align: 'right' });
+  doc.text(`Filtry: ${options.filterDescription}`, 148, 22, { align: 'center' });
+  doc.text(`Liczba wyników: ${options.patients.length}`, 282, 22, { align: 'right' });
+
+  // Table
+  const body = options.patients.map((p, i) => {
+    const due = getAmountDue(p);
+    return [
+      i + 1,
+      `${p.firstName} ${p.lastName}`,
+      p.pesel,
+      `Pakiet ${p.package}`,
+      p.applicationDate || '-',
+      `${p.treatmentStartDate || '-'} — ${p.treatmentEndDate || '-'}`,
+      formatCurrency(p.totalAmount),
+      formatCurrency(p.amountPaid),
+      formatCurrency(due),
+      due <= 0 ? 'Opłacone' : 'Nieopłacone',
+      normalizeVoivodeship(p.voivodeship) || '-',
+    ];
+  });
+
+  // Summary row
+  const totalAmount = options.patients.reduce((s, p) => s + p.totalAmount, 0);
+  const totalPaid = options.patients.reduce((s, p) => s + p.amountPaid, 0);
+  const totalDue = options.patients.reduce((s, p) => s + getAmountDue(p), 0);
+  body.push([
+    '', `RAZEM (${options.patients.length})`, '', '', '', '',
+    formatCurrency(totalAmount),
+    formatCurrency(totalPaid),
+    formatCurrency(totalDue),
+    '', ''
+  ]);
+
+  autoTable(doc, {
+    startY: 28,
+    head: [['Lp', 'Imię i nazwisko', 'PESEL', 'Pakiet', 'Zgłoszenie', 'Terapia (od — do)', 'Kwota', 'Wpłacono', 'Do zapłaty', 'Status', 'Województwo']],
+    body,
+    theme: 'grid',
+    styles: { font: 'Roboto', fontSize: 7.5, cellPadding: 2, lineColor: [200, 200, 200], lineWidth: 0.1 },
+    headStyles: { fillColor: [13, 148, 136], textColor: 255, fontStyle: 'bold', fontSize: 7.5 },
+    columnStyles: {
+      0: { cellWidth: 10, halign: 'center' },
+      1: { cellWidth: 38 },
+      2: { cellWidth: 26 },
+      3: { cellWidth: 16, halign: 'center' },
+      4: { cellWidth: 22 },
+      5: { cellWidth: 42 },
+      6: { cellWidth: 22, halign: 'right' },
+      7: { cellWidth: 22, halign: 'right' },
+      8: { cellWidth: 22, halign: 'right' },
+      9: { cellWidth: 22, halign: 'center' },
+      10: { cellWidth: 30 },
+    },
+    didParseCell: (data: any) => {
+      // Bold summary row
+      if (data.row.index === body.length - 1) {
+        data.cell.styles.fontStyle = 'bold';
+        data.cell.styles.fillColor = [240, 240, 240];
+      }
+      // Red for "Nieopłacone"
+      if (data.column.index === 9 && data.cell.raw === 'Nieopłacone') {
+        data.cell.styles.textColor = [220, 38, 38];
+        data.cell.styles.fontStyle = 'bold';
+      }
+      if (data.column.index === 9 && data.cell.raw === 'Opłacone') {
+        data.cell.styles.textColor = [22, 163, 74];
+      }
+    },
+  });
+
+  addPageNumbers(doc);
+  doc.save(`Lista_pacjentow_${new Date().toISOString().split('T')[0]}.pdf`);
+};
+
+// --- STATS PDF ---
+export interface StatsData {
+  totalPatients: number;
+  activePatients: number;
+  dischargedPatients: number;
+  totalRevenue: number;
+  totalCollected: number;
+  totalOutstanding: number;
+  collectionRate: number;
+  packageBreakdown: { pkg: string; count: number; revenue: number }[];
+  voivodeshipBreakdown: { name: string; count: number; revenue: number }[];
+  monthlyTrends: { month: string; label: string; count: number }[];
+  timePeriod: string;
+}
+
+export const generateStatsPDF = async (stats: StatsData) => {
+  const doc = new jsPDF();
+  await loadFonts(doc);
+
+  addLogo(doc);
+
+  const marginLeft = 15;
+  let y = 35;
+
+  doc.setFontSize(14);
+  doc.setFont("Roboto", "bold");
+  doc.text("Raport statystyczny MyWay CRM", 105, y, { align: 'center' });
+  y += 8;
+
+  doc.setFontSize(9);
+  doc.setFont("Roboto", "normal");
+  doc.text(`Data: ${new Date().toLocaleDateString('pl-PL')}  |  Okres: ${stats.timePeriod}`, 105, y, { align: 'center' });
+  y += 12;
+
+  // KPI Table
+  doc.setFontSize(11);
+  doc.setFont("Roboto", "bold");
+  doc.text("Podsumowanie", marginLeft, y);
+  y += 5;
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Wskaźnik', 'Wartość']],
+    body: [
+      ['Pacjenci ogółem', String(stats.totalPatients)],
+      ['Aktywni', String(stats.activePatients)],
+      ['Wypisani', String(stats.dischargedPatients)],
+      ['Przychód ogółem', formatCurrency(stats.totalRevenue)],
+      ['Wpłaty', formatCurrency(stats.totalCollected)],
+      ['Zaległości', formatCurrency(stats.totalOutstanding)],
+      ['Ściągalność', `${stats.collectionRate.toFixed(1)}%`],
+    ],
+    theme: 'grid',
+    styles: { font: 'Roboto', fontSize: 10, cellPadding: 3 },
+    headStyles: { fillColor: [13, 148, 136], textColor: 255, fontStyle: 'bold' },
+    columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 } },
+  });
+
+  y = (doc as any).lastAutoTable.finalY + 12;
+
+  // Packages
+  doc.setFontSize(11);
+  doc.setFont("Roboto", "bold");
+  doc.text("Pakiety", marginLeft, y);
+  y += 5;
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Pakiet', 'Liczba', 'Przychód']],
+    body: stats.packageBreakdown.map(p => [
+      `Pakiet ${p.pkg}`, String(p.count), formatCurrency(p.revenue)
+    ]),
+    theme: 'grid',
+    styles: { font: 'Roboto', fontSize: 10, cellPadding: 3 },
+    headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold' },
+  });
+
+  y = (doc as any).lastAutoTable.finalY + 12;
+
+  // Voivodeships
+  if (y > 230) { doc.addPage(); y = 20; }
+  doc.setFontSize(11);
+  doc.setFont("Roboto", "bold");
+  doc.text("Województwa", marginLeft, y);
+  y += 5;
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Województwo', 'Liczba', 'Przychód']],
+    body: stats.voivodeshipBreakdown.map(v => [
+      v.name, String(v.count), formatCurrency(v.revenue)
+    ]),
+    theme: 'grid',
+    styles: { font: 'Roboto', fontSize: 9, cellPadding: 2 },
+    headStyles: { fillColor: [124, 58, 237], textColor: 255, fontStyle: 'bold' },
+  });
+
+  y = (doc as any).lastAutoTable.finalY + 12;
+
+  // Monthly trends
+  if (y > 220) { doc.addPage(); y = 20; }
+  doc.setFontSize(11);
+  doc.setFont("Roboto", "bold");
+  doc.text("Przyjęcia miesięczne", marginLeft, y);
+  y += 5;
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Miesiąc', 'Przyjęcia']],
+    body: stats.monthlyTrends.map(m => [m.label, String(m.count)]),
+    theme: 'grid',
+    styles: { font: 'Roboto', fontSize: 10, cellPadding: 3 },
+    headStyles: { fillColor: [13, 148, 136], textColor: 255, fontStyle: 'bold' },
+  });
+
+  addPageNumbers(doc);
+  doc.save(`Raport_statystyki_${new Date().toISOString().split('T')[0]}.pdf`);
 };
