@@ -26,6 +26,7 @@ const defaultPatient: Omit<Patient, 'id'> = {
   totalAmount: 0,
   amountPaid: 0,
   paymentDeadline: '',
+  paymentMethod: 'przelew',
   isWeek5: false,
   hasWhatsapp: false,
   onlineConsultations: 0,
@@ -176,7 +177,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-6 bg-gray-50 p-5 rounded-lg border border-gray-200">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mt-6 bg-gray-50 p-5 rounded-lg border border-gray-200">
             <div>
               <label className="text-xs text-gray-700 font-bold mb-1 block uppercase">Kwota całkowita (PLN)</label>
               <input required type="number" name="totalAmount" value={formData.totalAmount || ''} onChange={handleChange} className={inputClass} placeholder="0.00" />
@@ -188,6 +189,15 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
             <div>
                 <label className="text-xs text-gray-700 font-bold mb-1 block uppercase">Termin zapłaty reszty</label>
                 <input required type="date" name="paymentDeadline" value={formData.paymentDeadline} onChange={handleChange} className={inputClass} />
+            </div>
+            <div>
+                <label className="text-xs text-gray-700 font-bold mb-1 block uppercase">Forma płatności</label>
+                <select name="paymentMethod" value={formData.paymentMethod || 'przelew'} onChange={handleChange} className={inputClass}>
+                  <option value="przelew">Przelew</option>
+                  <option value="gotowka">Gotówka</option>
+                  <option value="karta">Karta</option>
+                  <option value="przedplata">Przedpłata</option>
+                </select>
             </div>
           </div>
           

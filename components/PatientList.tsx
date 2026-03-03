@@ -562,6 +562,12 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                     <div className="text-xs text-gray-600 mb-2">
                       <span className="font-semibold">Koniec:</span> {patient.treatmentEndDate}
                     </div>
+                    {patient.paymentMethod && (
+                      <div className="text-xs text-gray-500 mb-2">
+                        <span className="font-semibold">Płatność:</span>{' '}
+                        <span className="capitalize">{patient.paymentMethod === 'gotowka' ? 'Gotówka' : patient.paymentMethod === 'przedplata' ? 'Przedpłata' : patient.paymentMethod === 'karta' ? 'Karta' : 'Przelew'}</span>
+                      </div>
+                    )}
                     <div className="text-xs mt-2 pt-2 border-t border-gray-200 flex items-center justify-between">
                       <div className="flex flex-col">
                         <span className="text-gray-500 text-[10px] uppercase">Do zapłaty:</span>

@@ -20,6 +20,7 @@ export interface Patient {
   totalAmount: number;
   amountPaid: number; // Zadatek
   paymentDeadline: string;
+  paymentMethod: 'przelew' | 'gotowka' | 'karta' | 'przedplata';
 
   // New management fields
   isWeek5: boolean;
