@@ -184,7 +184,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
             </div>
             <div>
               <label className="text-xs text-gray-700 font-bold mb-1 block uppercase">Wpłacono (PLN)</label>
-              <input required type="number" name="amountPaid" value={formData.amountPaid || ''} onChange={handleChange} className={inputClass} placeholder="0.00" />
+              <input type="number" name="amountPaid" value={formData.amountPaid} onChange={handleChange} className={inputClass} placeholder="0.00" />
             </div>
             <div>
                 <label className="text-xs text-gray-700 font-bold mb-1 block uppercase">Termin zapłaty reszty</label>
