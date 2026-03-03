@@ -13,6 +13,7 @@ interface PatientListProps {
 
 const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, onDeletePatient, onDischargePatient }) => {
   const [filterPackage, setFilterPackage] = useState<'all' | '1' | '2' | '3'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'discharged'>('active');
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -84,13 +85,17 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
     const matchesPayment = filterPaymentStatus === 'all' ||
                            (filterPaymentStatus === 'paid' && amountDue <= 0) ||
                            (filterPaymentStatus === 'unpaid' && amountDue > 0);
+    const matchesStatus = filterStatus === 'all' ||
+                          (filterStatus === 'active' && p.status !== 'discharged') ||
+                          (filterStatus === 'discharged' && p.status === 'discharged');
 
-    return matchesPackage && matchesSearch && matchesVoivodeship && matchesDateRange && matchesPayment;
+    return matchesPackage && matchesSearch && matchesVoivodeship && matchesDateRange && matchesPayment && matchesStatus;
   });
 
   // Count active filters
   const activeFiltersCount = [
     filterPackage !== 'all',
+    filterStatus !== 'active',
     filterVoivodeship !== 'all',
     filterDateRange !== 'all',
     filterPaymentStatus !== 'all'
@@ -133,6 +138,8 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
     try {
       const filterParts: string[] = [];
       if (filterPackage !== 'all') filterParts.push(`Pakiet ${filterPackage}`);
+      if (filterStatus === 'active') filterParts.push('Aktywni');
+      if (filterStatus === 'discharged') filterParts.push('Wypisani');
       if (filterPaymentStatus === 'paid') filterParts.push('Opłacone');
       if (filterPaymentStatus === 'unpaid') filterParts.push('Nieopłacone');
       if (filterVoivodeship !== 'all') filterParts.push(filterVoivodeship);
@@ -310,6 +317,38 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
           {/* Divider */}
           <div className="hidden md:block w-px h-6 bg-gray-200"></div>
 
+          {/* Status Filter (Active / Discharged) */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-gray-500 uppercase flex items-center gap-1">
+              <LogOut className="w-3 h-3" />
+              Status:
+            </span>
+            <div className="flex gap-1">
+              {([
+                { value: 'active', label: 'Aktywni' },
+                { value: 'discharged', label: 'Wypisani' },
+                { value: 'all', label: 'Wszyscy' }
+              ] as const).map((item) => (
+                <button
+                  key={item.value}
+                  onClick={() => setFilterStatus(item.value)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                    filterStatus === item.value
+                      ? item.value === 'active' ? 'bg-teal-600 text-white shadow-sm'
+                        : item.value === 'discharged' ? 'bg-purple-600 text-white shadow-sm'
+                        : 'bg-gray-600 text-white shadow-sm'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="hidden md:block w-px h-6 bg-gray-200"></div>
+
           {/* Payment Status Filter */}
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-gray-500 uppercase flex items-center gap-1">
@@ -420,6 +459,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
               <button
                 onClick={() => {
                   setFilterPackage('all');
+                  setFilterStatus('active');
                   setFilterVoivodeship('all');
                   setFilterDateRange('all');
                   setFilterPaymentStatus('all');
