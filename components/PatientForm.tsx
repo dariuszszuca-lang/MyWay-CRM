@@ -86,6 +86,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
   };
 
   const amountDue = formData.totalAmount - formData.amountPaid;
+  const isVip = formData.package === 'vip';
 
   // Styling enforcing white background and black text for inputs
   const inputClass = "p-2.5 border border-gray-300 rounded-lg w-full bg-white text-black placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all shadow-sm";
@@ -179,34 +180,42 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mt-6 bg-gray-50 p-5 rounded-lg border border-gray-200">
-            <div>
-              <label className="text-xs text-gray-700 font-bold mb-1 block uppercase">Kwota całkowita (PLN)</label>
-              <input required type="number" name="totalAmount" value={formData.totalAmount || ''} onChange={handleChange} className={inputClass} placeholder="0.00" />
+          {isVip ? (
+            <div className="mt-6 bg-purple-50 p-4 rounded-lg border border-purple-100 text-purple-700 font-medium text-sm">
+              Grupa VIP — bez kwoty do rozliczenia
             </div>
-            <div>
-              <label className="text-xs text-gray-700 font-bold mb-1 block uppercase">Wpłacono (PLN)</label>
-              <input type="number" name="amountPaid" value={formData.amountPaid} onChange={handleChange} className={inputClass} placeholder="0.00" />
-            </div>
-            <div>
-                <label className="text-xs text-gray-700 font-bold mb-1 block uppercase">Termin zapłaty reszty</label>
-                <input required type="date" name="paymentDeadline" value={formData.paymentDeadline} onChange={handleChange} className={inputClass} />
-            </div>
-            <div>
-                <label className="text-xs text-gray-700 font-bold mb-1 block uppercase">Forma płatności</label>
-                <select name="paymentMethod" value={formData.paymentMethod || 'przelew'} onChange={handleChange} className={inputClass}>
-                  <option value="przelew">Przelew</option>
-                  <option value="gotowka">Gotówka</option>
-                  <option value="karta">Karta</option>
-                  <option value="przedplata">Przedpłata</option>
-                </select>
-            </div>
-          </div>
-          
-          <div className="mt-6 flex items-center gap-2 text-teal-900 font-bold bg-teal-50 p-4 rounded-lg border border-teal-100 shadow-sm">
-            <Calculator className="w-5 h-5" />
-            <span>Do zapłaty: {formatCurrency(amountDue)}</span>
-          </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mt-6 bg-gray-50 p-5 rounded-lg border border-gray-200">
+                <div>
+                  <label className="text-xs text-gray-700 font-bold mb-1 block uppercase">Kwota całkowita (PLN)</label>
+                  <input required type="number" name="totalAmount" value={formData.totalAmount || ''} onChange={handleChange} className={inputClass} placeholder="0.00" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-700 font-bold mb-1 block uppercase">Wpłacono (PLN)</label>
+                  <input type="number" name="amountPaid" value={formData.amountPaid} onChange={handleChange} className={inputClass} placeholder="0.00" />
+                </div>
+                <div>
+                    <label className="text-xs text-gray-700 font-bold mb-1 block uppercase">Termin zapłaty reszty</label>
+                    <input required type="date" name="paymentDeadline" value={formData.paymentDeadline} onChange={handleChange} className={inputClass} />
+                </div>
+                <div>
+                    <label className="text-xs text-gray-700 font-bold mb-1 block uppercase">Forma płatności</label>
+                    <select name="paymentMethod" value={formData.paymentMethod || 'przelew'} onChange={handleChange} className={inputClass}>
+                      <option value="przelew">Przelew</option>
+                      <option value="gotowka">Gotówka</option>
+                      <option value="karta">Karta</option>
+                      <option value="przedplata">Przedpłata</option>
+                    </select>
+                </div>
+              </div>
+
+              <div className="mt-6 flex items-center gap-2 text-teal-900 font-bold bg-teal-50 p-4 rounded-lg border border-teal-100 shadow-sm">
+                <Calculator className="w-5 h-5" />
+                <span>Do zapłaty: {formatCurrency(amountDue)}</span>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="flex gap-4">
