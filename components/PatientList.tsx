@@ -12,7 +12,7 @@ interface PatientListProps {
 }
 
 const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, onDeletePatient, onDischargePatient }) => {
-  const [filterPackage, setFilterPackage] = useState<'all' | '1' | '2' | '3'>('all');
+  const [filterPackage, setFilterPackage] = useState<'all' | '1' | '2' | '3' | 'interwencyjna' | 'vip'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'discharged'>('active');
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -137,7 +137,10 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
     setIsExportingPDF(true);
     try {
       const filterParts: string[] = [];
-      if (filterPackage !== 'all') filterParts.push(`Pakiet ${filterPackage}`);
+      if (filterPackage !== 'all') {
+        const pkgLabel = filterPackage === 'interwencyjna' ? 'Terapia interwencyjna' : filterPackage === 'vip' ? 'Grupa VIP' : `Pakiet ${filterPackage}`;
+        filterParts.push(pkgLabel);
+      }
       if (filterStatus === 'active') filterParts.push('Aktywni');
       if (filterStatus === 'discharged') filterParts.push('Wypisani');
       if (filterPaymentStatus === 'paid') filterParts.push('Opłacone');
@@ -298,17 +301,24 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-gray-500 uppercase">Pakiet:</span>
             <div className="flex gap-1">
-              {(['all', '1', '2', '3'] as const).map((pkg) => (
+              {([
+                { value: 'all', label: 'Wszyscy' },
+                { value: '1', label: '1' },
+                { value: '2', label: '2' },
+                { value: '3', label: '3' },
+                { value: 'interwencyjna', label: 'Interw.' },
+                { value: 'vip', label: 'VIP' },
+              ] as const).map((pkg) => (
                 <button
-                  key={pkg}
-                  onClick={() => setFilterPackage(pkg)}
+                  key={pkg.value}
+                  onClick={() => setFilterPackage(pkg.value)}
                   className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-colors whitespace-nowrap ${
-                    filterPackage === pkg
+                    filterPackage === pkg.value
                       ? 'bg-teal-600 text-white shadow-sm'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
-                  {pkg === 'all' ? 'Wszyscy' : pkg}
+                  {pkg.label}
                 </button>
               ))}
             </div>
@@ -552,9 +562,13 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                     <span className={`inline-block px-2 py-1 rounded text-xs font-bold mb-2 ${
                       patient.package === '3' ? 'bg-purple-100 text-purple-800' :
                       patient.package === '2' ? 'bg-blue-100 text-blue-800' :
+                      patient.package === 'interwencyjna' ? 'bg-amber-100 text-amber-800' :
+                      patient.package === 'vip' ? 'bg-rose-100 text-rose-800' :
                       'bg-teal-100 text-teal-800'
                     }`}>
-                      Pakiet {patient.package}
+                      {patient.package === 'interwencyjna' ? 'Terapia interwencyjna' :
+                       patient.package === 'vip' ? 'Grupa VIP' :
+                       `Pakiet ${patient.package}`}
                     </span>
                     <div className="text-xs text-gray-600">
                       <span className="font-semibold">Start:</span> {patient.treatmentStartDate}

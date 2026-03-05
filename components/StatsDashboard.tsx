@@ -78,7 +78,7 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
 
   // Package breakdown
   const packages = useMemo(() => {
-    return (['1', '2', '3'] as const).map(pkg => {
+    return (['1', '2', '3', 'interwencyjna', 'vip'] as const).map(pkg => {
       const list = filtered.filter(p => p.package === pkg);
       return {
         pkg,
@@ -148,7 +148,8 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
     }
   };
 
-  const pkgColors = { '1': 'teal', '2': 'blue', '3': 'purple' } as const;
+  const pkgColors: Record<string, string> = { '1': 'teal', '2': 'blue', '3': 'purple', 'interwencyjna': 'amber', 'vip': 'rose' };
+  const pkgNames: Record<string, string> = { '1': 'Pakiet 1', '2': 'Pakiet 2', '3': 'Pakiet 3', 'interwencyjna': 'Terapia interwencyjna', 'vip': 'Grupa VIP' };
 
   if (patients.length === 0) {
     return (
@@ -282,22 +283,33 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
           <div className="space-y-4">
             {packages.map(p => {
               const pct = filtered.length > 0 ? (p.count / filtered.length) * 100 : 0;
-              const color = pkgColors[p.pkg];
+              const color = pkgColors[p.pkg] || 'gray';
+              const name = pkgNames[p.pkg] || `Pakiet ${p.pkg}`;
+              const barClass =
+                color === 'teal' ? 'bg-teal-500' :
+                color === 'blue' ? 'bg-blue-500' :
+                color === 'purple' ? 'bg-purple-500' :
+                color === 'amber' ? 'bg-amber-500' :
+                color === 'rose' ? 'bg-rose-500' :
+                'bg-gray-500';
+              const textClass =
+                color === 'teal' ? 'text-teal-700' :
+                color === 'blue' ? 'text-blue-700' :
+                color === 'purple' ? 'text-purple-700' :
+                color === 'amber' ? 'text-amber-700' :
+                color === 'rose' ? 'text-rose-700' :
+                'text-gray-700';
               return (
                 <div key={p.pkg}>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className={`text-sm font-bold text-${color}-700`}>Pakiet {p.pkg}</span>
+                    <span className={`text-sm font-bold ${textClass}`}>{name}</span>
                     <span className="text-sm text-gray-500">
                       {p.count} ({pct.toFixed(0)}%) · {formatCurrency(p.revenue)}
                     </span>
                   </div>
                   <div className="h-3 rounded-full bg-gray-100 overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all duration-700 ${
-                        color === 'teal' ? 'bg-teal-500' :
-                        color === 'blue' ? 'bg-blue-500' :
-                        'bg-purple-500'
-                      }`}
+                      className={`h-full rounded-full transition-all duration-700 ${barClass}`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
