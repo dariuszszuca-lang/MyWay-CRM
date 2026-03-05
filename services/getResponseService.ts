@@ -7,7 +7,7 @@ interface PatientEmailData {
   email: string;
   firstName: string;
   lastName: string;
-  package: '1' | '2' | '3';
+  package: '1' | '2' | '3' | 'interwencyjna' | 'vip';
   phone?: string;
 }
 
@@ -53,7 +53,7 @@ export const confirmPatientEmail = async (data: {
   email: string;
   firstName: string;
   lastName: string;
-  package: '1' | '2' | '3';
+  package: '1' | '2' | '3' | 'interwencyjna' | 'vip';
   phone?: string;
   startDate?: string;
   endDate?: string;
@@ -91,7 +91,7 @@ export const confirmPatientEmail = async (data: {
 export const dischargePatientEmail = async (data: {
   email: string;
   firstName: string;
-  package: '1' | '2' | '3';
+  package: '1' | '2' | '3' | 'interwencyjna' | 'vip';
 }): Promise<boolean> => {
   try {
     const response = await fetch(`${CF_BASE}/onPatientDischarged`, {

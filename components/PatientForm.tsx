@@ -173,6 +173,8 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
                 <option value="1">Pakiet 1</option>
                 <option value="2">Pakiet 2</option>
                 <option value="3">Pakiet 3</option>
+                <option value="interwencyjna">Terapia interwencyjna</option>
+                <option value="vip">Grupa VIP</option>
               </select>
             </div>
           </div>

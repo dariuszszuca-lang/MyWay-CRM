@@ -40,12 +40,14 @@ function formatDatePL(dateString) {
 // GETRESPONSE - dodawanie pacjentów do list mailingowych + maile
 // =======================================================================
 
-const GETRESPONSE_API_KEY = "vmnpekcq9jurqcsf1ftgtht18abg4ooe";
+const GETRESPONSE_API_KEY = "c18eyppbt6zeen7ozs87y8ks35s96srh";
 
 const CAMPAIGN_IDS = {
   "1": "iccz2",  // PAKIET 1
   "2": "fzbxf",  // PAKIET 2
   "3": "ij5Ot",  // PAKIET 3
+  "interwencyjna": "fuJ9s",  // TERAPIA INTERWENCYJNA
+  "vip": "fuJwg",  // GRUPA VIP
 };
 
 const ALL_CONTACTS_CAMPAIGN_ID = "Lik0s";  // WSZYSTKIE KONTAKTY
@@ -130,7 +132,9 @@ function getWelcomeEmailHtml(firstName, packageType, startDate, endDate) {
   const packageNames = {
     "1": "Pakiet 1 — Podstawowy (28 dni)",
     "2": "Pakiet 2 — Rozszerzony",
-    "3": "Pakiet 3 — Stacjonarny (8 tygodni)",
+    "3": "Pakiet 3 — Stacjonarny (4+1 tygodni)",
+    "interwencyjna": "Terapia interwencyjna",
+    "vip": "Grupa VIP",
   };
   const packageName = packageNames[packageType] || `Pakiet ${packageType}`;
 
@@ -162,7 +166,7 @@ function getWelcomeEmailHtml(firstName, packageType, startDate, endDate) {
 
     <div style="text-align:center;margin:24px 0;">
       <p style="font-size:15px;color:#555;margin:0 0 12px;">🎬 Przed przyjazdem poznaj nas lepiej:</p>
-      <a href="https://osrodek-myway.pl" style="display:inline-block;background:#0d9488;color:#ffffff;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px;">Zobacz nasz ośrodek →</a>
+      <a href="https://www.youtube.com/watch?v=Q04DVNhJ8gw" style="display:inline-block;background:#0d9488;color:#ffffff;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px;">Obejrzyj podcast Krystiana →</a>
     </div>
 
     <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:20px;margin:24px 0;">
@@ -176,8 +180,20 @@ function getWelcomeEmailHtml(firstName, packageType, startDate, endDate) {
         <tr><td>✅ Kurtka dostosowana do pogody</td></tr>
         <tr><td>✅ Laptop i telefon (jeśli jesteś aktywny/a zawodowo)</td></tr>
         <tr><td>✅ Dowód osobisty (potrzebny przy przyjęciu)</td></tr>
+        <tr><td>✅ Ulubione lub aktualnie czytane książki</td></tr>
+        <tr><td>✅ Leki i suplementy — jeśli przyjmujesz na stałe, zabierz zapas wraz z dawkowaniem i dokumentacją medyczną. <strong>Wszystkie leki przekaż terapeucie w gabinecie lekarskim.</strong></td></tr>
+        <tr><td>✅ Papierosy (dostęp do sklepu jest ograniczony regulaminem ośrodka)</td></tr>
       </table>
     </div>
+
+    ${packageType === "3" ? `
+    <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:20px;margin:24px 0;">
+      <h3 style="margin:0 0 12px;color:#7c3aed;font-size:16px;">🎁 Bonus w Twoim pakiecie</h3>
+      <p style="font-size:14px;color:#555;line-height:1.6;margin:0;">
+        Twój pakiet to <strong>4+1 tygodni</strong> — 4 tygodnie terapii stacjonarnej + <strong>dodatkowy tydzień pobytu</strong> do wykorzystania w ciągu <strong>6 miesięcy</strong> od zakończenia terapii. Dodatkowo masz <strong>20 konsultacji indywidualnych</strong> (online lub na miejscu) — <a href="https://mywaypoint.pl" style="color:#7c3aed;font-weight:bold;">umów się przez mywaypoint.pl</a>. Możesz z nich korzystać, kiedy poczujesz taką potrzebę — wystarczy, że do nas zadzwonisz.
+      </p>
+    </div>
+    ` : ""}
 
     <div style="background:#f8fafc;border-radius:8px;padding:20px;margin:24px 0;text-align:center;">
       <p style="font-size:15px;color:#555;margin:0 0 8px;">Masz pytania? Dzwoń śmiało:</p>
@@ -185,21 +201,58 @@ function getWelcomeEmailHtml(firstName, packageType, startDate, endDate) {
       <p style="margin:8px 0 0;"><a href="tel:+48536598821" style="font-size:16px;color:#0d9488;text-decoration:none;">📞 536 598 821</a></p>
     </div>
 
+    <div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:8px;padding:20px;margin:24px 0;">
+      <h3 style="margin:0 0 16px;color:#0d9488;font-size:16px;text-align:center;">🌐 Zostań z nami w kontakcie</h3>
+      <table style="width:100%;font-size:14px;color:#555;border-collapse:collapse;">
+        <tr>
+          <td style="padding:8px 0;text-align:center;width:50%;vertical-align:top;">
+            <a href="https://osrodek-myway.pl" style="color:#0d9488;text-decoration:none;font-weight:bold;">🏡 Nasz ośrodek</a><br>
+            <span style="font-size:12px;color:#94a3b8;">osrodek-myway.pl</span>
+          </td>
+          <td style="padding:8px 0;text-align:center;width:50%;vertical-align:top;">
+            <a href="https://mywaypoint.pl" style="color:#0d9488;text-decoration:none;font-weight:bold;">📅 Rezerwacje online</a><br>
+            <span style="font-size:12px;color:#94a3b8;">mywaypoint.pl</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0;text-align:center;vertical-align:top;">
+            <a href="https://edu-myway.pl" style="color:#0d9488;text-decoration:none;font-weight:bold;">🎓 Platforma edukacyjna</a><br>
+            <span style="font-size:12px;color:#94a3b8;">edu-myway.pl</span>
+          </td>
+          <td style="padding:8px 0;text-align:center;vertical-align:top;">
+            <a href="https://wygrajtrzezwezycie.pl" style="color:#7c3aed;text-decoration:none;font-weight:bold;">📖 Nasza książka</a><br>
+            <span style="font-size:12px;color:#94a3b8;">wygrajtrzezwezycie.pl</span>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="2" style="padding:8px 0;text-align:center;">
+            <a href="https://myway-links.lovable.app" style="color:#0d9488;text-decoration:none;font-weight:bold;">📱 Nasze social media</a>
+          </td>
+        </tr>
+      </table>
+    </div>
+
     <p style="font-size:15px;color:#555;line-height:1.6;">Do zobaczenia wkrótce! 🙌</p>
     <p style="font-size:15px;color:#333;margin:0;"><strong>Ekipa My Way</strong></p>
   </div>
 
   <div style="background:#f8fafc;padding:16px 24px;text-align:center;border-top:1px solid #e5e7eb;">
-    <a href="https://osrodek-myway.pl" style="color:#0d9488;font-size:13px;text-decoration:none;">osrodek-myway.pl</a>
-    <span style="color:#d1d5db;margin:0 8px;">·</span>
-    <span style="color:#9ca3af;font-size:13px;">ul. Wichrowe Wzgórza 21, Kąpino</span>
+    <p style="margin:0;color:#9ca3af;font-size:12px;">ul. Wichrowe Wzgórza 21, Kąpino 84-200</p>
   </div>
 </div>
 </body></html>`;
 }
 
 function getWelcomeEmailPlain(firstName, packageType, startDate) {
-  return `Cześć ${firstName}!\n\nPotwierdzamy Twój termin w Ośrodku My Way.\n\nWariant terapii: Pakiet ${packageType}\n${startDate ? `Data przyjazdu: ${startDate}\n` : ""}\nCo spakować:\n- Środki higieny osobistej\n- Ręcznik\n- Ubrania na min. 7 dni\n- Strój sportowy\n- Obuwie + klapki\n- Kurtka\n- Laptop i telefon\n- Dowód osobisty\n\nMasz pytania? Dzwoń: 731 395 295\n\nDo zobaczenia!\nEkipa My Way\nosrodek-myway.pl`;
+  const packageNames = {
+    "1": "Pakiet 1 — Podstawowy (28 dni)",
+    "2": "Pakiet 2 — Rozszerzony",
+    "3": "Pakiet 3 — Stacjonarny (4+1 tygodni)",
+    "interwencyjna": "Terapia interwencyjna",
+    "vip": "Grupa VIP",
+  };
+  const packageName = packageNames[packageType] || `Pakiet ${packageType}`;
+  return `Cześć ${firstName}!\n\nPotwierdzamy Twój termin w Ośrodku My Way.\n\nWariant terapii: ${packageName}\n${startDate ? `Data przyjazdu: ${startDate}\n` : ""}\nCo spakować:\n- Środki higieny osobistej\n- Ręcznik\n- Ubrania na min. 7 dni\n- Strój sportowy\n- Obuwie + klapki\n- Kurtka\n- Laptop i telefon\n- Dowód osobisty\n- Ulubione lub aktualnie czytane książki\n- Leki i suplementy (zapas + dawkowanie, przekaż terapeucie)\n- Papierosy (dostęp do sklepu ograniczony regulaminem)\n${packageType === "3" ? `\nBonus w Twoim pakiecie:\nTwój pakiet to 4+1 tygodni (4 tygodnie stacjonarnie + dodatkowy tydzień do wykorzystania w ciągu 6 miesięcy). Dodatkowo masz 20 konsultacji indywidualnych (online lub na miejscu).\n` : ""}\nMasz pytania? Dzwoń: 731 395 295\n\nDo zobaczenia!\nEkipa My Way\nosrodek-myway.pl`;
 }
 
 function getFarewellEmailHtml(firstName, packageType) {
@@ -228,7 +281,8 @@ function getFarewellEmailHtml(firstName, packageType) {
     <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:20px;margin:24px 0;">
       <h3 style="margin:0 0 12px;color:#7c3aed;font-size:16px;">🎯 Co mamy dla Ciebie dalej?</h3>
       <table style="font-size:14px;color:#555;line-height:2;">
-        ${isPackage3 ? `<tr><td>💬 <strong>20 spotkań indywidualnych</strong> — online lub na miejscu</td></tr>` : ""}
+        ${isPackage3 ? `<tr><td>🏡 <strong>Dodatkowy tydzień pobytu</strong> — masz go do wykorzystania w ciągu 6 miesięcy. Kiedy poczujesz potrzebę — dzwoń i umawiamy termin.</td></tr>
+        <tr><td>💬 <strong>20 konsultacji indywidualnych</strong> — online lub na miejscu, <a href="https://mywaypoint.pl" style="color:#7c3aed;font-weight:bold;">umów się przez mywaypoint.pl</a></td></tr>` : ""}
         <tr><td>⭐ <strong>Grupa VIP z Krystianem Nagabą</strong> — dostęp w ramach pakietu</td></tr>
       </table>
     </div>
@@ -239,8 +293,10 @@ function getFarewellEmailHtml(firstName, packageType) {
         Trzeźwienie to sport zespołowy, dlatego zapraszamy Cię do naszej społeczności:
       </p>
       <table style="font-size:14px;color:#555;line-height:2;">
-        <tr><td>☕ <strong>Sobotnie zjazdy</strong> — w każdą sobotę o 10:00 w ośrodku. Wpadaj na kawę i rozmowę!</td></tr>
+        <tr><td>☕ <strong>Zjazdy absolwentów</strong> — w każdą sobotę, godz. 10:00–13:00 w ośrodku. Wpadaj na kawę i rozmowę!</td></tr>
         <tr><td>📱 <strong>Grupa na WhatsApp</strong> — nasza bezpieczna przestrzeń 24/7. Jeśli nie masz dostępu, daj znać!</td></tr>
+        <tr><td>🎓 <strong>Platforma edukacyjna</strong> — materiały, ćwiczenia i wsparcie online: <a href="https://edu-myway.pl" style="color:#065f46;font-weight:bold;">edu-myway.pl</a></td></tr>
+        <tr><td>🔴 <strong>Live z Krystianem</strong> — transmisje na żywo na naszych social mediach. Bądź na bieżąco!</td></tr>
       </table>
     </div>
 
@@ -269,6 +325,8 @@ function getFarewellEmailHtml(firstName, packageType) {
   <div style="background:#f8fafc;padding:16px 24px;text-align:center;border-top:1px solid #e5e7eb;">
     <a href="https://osrodek-myway.pl" style="color:#0d9488;font-size:13px;text-decoration:none;">osrodek-myway.pl</a>
     <span style="color:#d1d5db;margin:0 8px;">·</span>
+    <a href="https://edu-myway.pl" style="color:#0d9488;font-size:13px;text-decoration:none;">edu-myway.pl</a>
+    <span style="color:#d1d5db;margin:0 8px;">·</span>
     <a href="https://wygrajtrzezwezycie.pl" style="color:#7c3aed;font-size:13px;text-decoration:none;">wygrajtrzezwezycie.pl</a>
   </div>
 </div>
@@ -277,7 +335,7 @@ function getFarewellEmailHtml(firstName, packageType) {
 
 function getFarewellEmailPlain(firstName, packageType) {
   const isPackage3 = packageType === "3";
-  return `Cześć ${firstName}!\n\nGratulacje — właśnie domykasz ważny rozdział!\n\nCo dalej:\n${isPackage3 ? "- 20 spotkań indywidualnych (online lub na miejscu)\n" : ""}- Grupa VIP z Krystianem Nagabą\n\nZostań z nami:\n- Sobotnie zjazdy — co sobotę o 10:00 w ośrodku\n- Grupa na WhatsApp — nasza przestrzeń 24/7\n\nKsiążka: https://wygrajtrzezwezycie.pl\n\nGdyby działo się coś trudnego — dzwoń:\n536 598 821\n731 395 295\n\nŚciskamy!\nEkipa My Way\nosrodek-myway.pl`;
+  return `Cześć ${firstName}!\n\nGratulacje — właśnie domykasz ważny rozdział!\n\nCo dalej:\n${isPackage3 ? "- 20 spotkań indywidualnych (online lub na miejscu)\n" : ""}- Grupa VIP z Krystianem Nagabą\n\nZostań z nami:\n- Zjazdy absolwentów — co sobotę 10:00-13:00 w ośrodku\n- Grupa na WhatsApp — nasza przestrzeń 24/7\n- Platforma edukacyjna: https://edu-myway.pl\n- Live z Krystianem — na naszych social mediach\n\nKsiążka: https://wygrajtrzezwezycie.pl\n\nGdyby działo się coś trudnego — dzwoń:\n536 598 821\n731 395 295\n\nŚciskamy!\nEkipa My Way\nosrodek-myway.pl`;
 }
 
 // =======================================================================
