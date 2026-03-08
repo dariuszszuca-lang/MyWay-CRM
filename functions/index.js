@@ -7,7 +7,7 @@ admin.initializeApp();
 // RESEND - powiadomienia o sesjach/rezerwacjach (MyWayPoint)
 // =======================================================================
 
-const RESEND_API_KEY = "re_Qy8GeLdK_CT2bMkzFoSyFjT1CR4dmazEK";
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
 async function sendEmailWithResend(to, subject, html, text) {
   const response = await fetch("https://api.resend.com/emails", {
@@ -40,7 +40,7 @@ function formatDatePL(dateString) {
 // GETRESPONSE - dodawanie pacjentów do list mailingowych + maile
 // =======================================================================
 
-const GETRESPONSE_API_KEY = "c18eyppbt6zeen7ozs87y8ks35s96srh";
+const GETRESPONSE_API_KEY = process.env.GETRESPONSE_API_KEY;
 
 const CAMPAIGN_IDS = {
   "1": "iccz2",  // PAKIET 1

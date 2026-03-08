@@ -1,0 +1,7 @@
+# Firebase ignore (overrides .gitignore for deploy)
+# IMPORTANT: .env is NOT ignored here - Firebase Functions needs it
+node_modules
+.git
+dist
+*.local
+*.log
