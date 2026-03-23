@@ -22,16 +22,14 @@ export interface Patient {
   paymentDeadline: string;
   paymentMethod: 'przelew' | 'gotowka' | 'karta' | 'przedplata'; // Legacy
 
-  // Wpłaty (nowe)
-  payment1Amount?: number;
-  payment1Date?: string;
-  payment1Method?: 'przelew' | 'gotowka' | 'karta' | 'przedplata';
-  payment2Amount?: number;
-  payment2Date?: string;
-  payment2Method?: 'przelew' | 'gotowka' | 'karta' | 'przedplata';
-  payment3Amount?: number;
-  payment3Date?: string;
-  payment3Method?: 'przelew' | 'gotowka' | 'karta' | 'przedplata';
+  // Wpłaty (dynamiczna lista)
+  payments?: Payment[];
+}
+
+export interface Payment {
+  amount: number;
+  date: string;
+  method: 'przelew' | 'gotowka' | 'karta' | 'przedplata';
 
   // New management fields
   isWeek5: boolean;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Patient, QueuePatient, formatCurrency } from '../types';
-import { PlusCircle, Calculator, Save, X } from 'lucide-react';
+import { Patient, Payment, QueuePatient, formatCurrency } from '../types';
+import { PlusCircle, Calculator, Save, X, Trash2 } from 'lucide-react';
 
 interface PatientFormProps {
   onSubmit: (patient: Patient) => void;
@@ -35,16 +35,19 @@ const defaultPatient: Omit<Patient, 'id'> = {
 
 const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCancel, prefillFromQueue }) => {
   const [formData, setFormData] = useState<Omit<Patient, 'id'> | Patient>(defaultPatient);
+  const [payments, setPayments] = useState<Payment[]>([]);
 
   useEffect(() => {
     if (initialData) {
-      // Migracja starych danych: jeśli jest amountPaid ale nie ma payment1Amount
-      const migrated = { ...initialData };
-      if (initialData.amountPaid > 0 && !initialData.payment1Amount) {
-        migrated.payment1Amount = initialData.amountPaid;
-        migrated.payment1Method = initialData.paymentMethod || 'przelew';
+      setFormData(initialData);
+      // Migracja: stare amountPaid → pierwsza wpłata
+      if (initialData.payments && initialData.payments.length > 0) {
+        setPayments(initialData.payments);
+      } else if (initialData.amountPaid > 0) {
+        setPayments([{ amount: initialData.amountPaid, date: '', method: initialData.paymentMethod || 'przelew' }]);
+      } else {
+        setPayments([]);
       }
-      setFormData(migrated);
     }
   }, [initialData]);
 
@@ -75,13 +78,26 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
     }));
   };
 
+  const addPayment = () => {
+    setPayments(prev => [...prev, { amount: 0, date: new Date().toISOString().split('T')[0], method: 'przelew' }]);
+  };
+
+  const removePayment = (index: number) => {
+    setPayments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updatePayment = (index: number, field: keyof Payment, value: string | number) => {
+    setPayments(prev => prev.map((p, i) => i === index ? { ...p, [field]: field === 'amount' ? Number(value) : value } : p));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     // If editing (initialData exists), use existing ID, otherwise generate new
     const patientToSave: Patient = {
       ...formData,
-      amountPaid: (formData.payment1Amount || 0) + (formData.payment2Amount || 0) + (formData.payment3Amount || 0),
+      payments,
+      amountPaid: payments.reduce((sum, p) => sum + (p.amount || 0), 0),
       id: initialData?.id || crypto.randomUUID()
     };
 
@@ -93,7 +109,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
     }
   };
 
-  const totalPaid = (formData.payment1Amount || 0) + (formData.payment2Amount || 0) + (formData.payment3Amount || 0);
+  const totalPaid = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
   const amountDue = formData.totalAmount - totalPaid;
   const isVip = formData.package === 'vip';
 
@@ -207,79 +223,50 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
                 </div>
               </div>
 
-              {/* 3 Wpłaty */}
+              {/* Wpłaty — dynamiczna lista */}
               <div className="mt-4 space-y-3">
-                {/* Wpłata 1 */}
-                <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
-                  <p className="text-xs font-bold text-emerald-700 uppercase mb-3">Wpłata 1</p>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="text-xs text-gray-600 font-semibold mb-1 block">Kwota (PLN)</label>
-                      <input type="number" name="payment1Amount" value={formData.payment1Amount || ''} onChange={handleChange} className={inputClass} placeholder="0.00" />
+                {payments.map((payment, index) => (
+                  <div key={index} className="bg-gray-50 p-4 rounded-lg border border-gray-200 relative">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs font-bold text-teal-700 uppercase">Wpłata {index + 1}</p>
+                      <button
+                        type="button"
+                        onClick={() => removePayment(index)}
+                        className="text-red-400 hover:text-red-600 transition p-1"
+                        title="Usuń wpłatę"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
-                    <div>
-                      <label className="text-xs text-gray-600 font-semibold mb-1 block">Data wpłaty</label>
-                      <input type="date" name="payment1Date" value={formData.payment1Date || ''} onChange={handleChange} className={inputClass} />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-600 font-semibold mb-1 block">Forma</label>
-                      <select name="payment1Method" value={formData.payment1Method || 'przelew'} onChange={handleChange} className={inputClass}>
-                        <option value="przelew">Przelew</option>
-                        <option value="gotowka">Gotówka</option>
-                        <option value="karta">Karta</option>
-                        <option value="przedplata">Przedpłata</option>
-                      </select>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="text-xs text-gray-600 font-semibold mb-1 block">Kwota (PLN)</label>
+                        <input type="number" value={payment.amount || ''} onChange={(e) => updatePayment(index, 'amount', e.target.value)} className={inputClass} placeholder="0.00" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600 font-semibold mb-1 block">Data wpłaty</label>
+                        <input type="date" value={payment.date || ''} onChange={(e) => updatePayment(index, 'date', e.target.value)} className={inputClass} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600 font-semibold mb-1 block">Forma</label>
+                        <select value={payment.method || 'przelew'} onChange={(e) => updatePayment(index, 'method', e.target.value)} className={inputClass}>
+                          <option value="przelew">Przelew</option>
+                          <option value="gotowka">Gotówka</option>
+                          <option value="karta">Karta</option>
+                          <option value="przedplata">Przedpłata</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
-                </div>
+                ))}
 
-                {/* Wpłata 2 */}
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                  <p className="text-xs font-bold text-blue-700 uppercase mb-3">Wpłata 2</p>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="text-xs text-gray-600 font-semibold mb-1 block">Kwota (PLN)</label>
-                      <input type="number" name="payment2Amount" value={formData.payment2Amount || ''} onChange={handleChange} className={inputClass} placeholder="0.00" />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-600 font-semibold mb-1 block">Data wpłaty</label>
-                      <input type="date" name="payment2Date" value={formData.payment2Date || ''} onChange={handleChange} className={inputClass} />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-600 font-semibold mb-1 block">Forma</label>
-                      <select name="payment2Method" value={formData.payment2Method || 'przelew'} onChange={handleChange} className={inputClass}>
-                        <option value="przelew">Przelew</option>
-                        <option value="gotowka">Gotówka</option>
-                        <option value="karta">Karta</option>
-                        <option value="przedplata">Przedpłata</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Wpłata 3 */}
-                <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
-                  <p className="text-xs font-bold text-amber-700 uppercase mb-3">Wpłata 3</p>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="text-xs text-gray-600 font-semibold mb-1 block">Kwota (PLN)</label>
-                      <input type="number" name="payment3Amount" value={formData.payment3Amount || ''} onChange={handleChange} className={inputClass} placeholder="0.00" />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-600 font-semibold mb-1 block">Data wpłaty</label>
-                      <input type="date" name="payment3Date" value={formData.payment3Date || ''} onChange={handleChange} className={inputClass} />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-600 font-semibold mb-1 block">Forma</label>
-                      <select name="payment3Method" value={formData.payment3Method || 'przelew'} onChange={handleChange} className={inputClass}>
-                        <option value="przelew">Przelew</option>
-                        <option value="gotowka">Gotówka</option>
-                        <option value="karta">Karta</option>
-                        <option value="przedplata">Przedpłata</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  onClick={addPayment}
+                  className="w-full py-3 rounded-lg border-2 border-dashed border-teal-300 text-teal-600 font-semibold text-sm hover:bg-teal-50 hover:border-teal-400 transition flex items-center justify-center gap-2"
+                >
+                  <PlusCircle size={16} /> Dodaj wpłatę
+                </button>
               </div>
 
               {/* Podsumowanie */}
