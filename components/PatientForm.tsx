@@ -104,7 +104,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
   const isEditing = !!initialData;
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 max-h-[90vh] overflow-y-auto">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-bold text-teal-800 flex items-center gap-2">
           {isEditing ? <Save className="w-6 h-6" /> : <PlusCircle className="w-6 h-6" />}
