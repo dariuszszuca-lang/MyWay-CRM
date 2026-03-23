@@ -24,12 +24,6 @@ export interface Patient {
 
   // Wpłaty (dynamiczna lista)
   payments?: Payment[];
-}
-
-export interface Payment {
-  amount: number;
-  date: string;
-  method: 'przelew' | 'gotowka' | 'karta' | 'przedplata';
 
   // New management fields
   isWeek5: boolean;
@@ -39,6 +33,12 @@ export interface Payment {
 
   // Patient status
   status?: 'active' | 'discharged';
+}
+
+export interface Payment {
+  amount: number;
+  date: string;
+  method: 'przelew' | 'gotowka' | 'karta' | 'przedplata';
 }
 
 // Queue (Kolejka) - patients waiting for admission
