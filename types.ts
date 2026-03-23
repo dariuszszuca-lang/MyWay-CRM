@@ -18,9 +18,20 @@ export interface Patient {
   // Financial
   package: '1' | '2' | '3' | 'interwencyjna' | 'vip';
   totalAmount: number;
-  amountPaid: number; // Zadatek
+  amountPaid: number; // Legacy — suma wpłat (backwards compat)
   paymentDeadline: string;
-  paymentMethod: 'przelew' | 'gotowka' | 'karta' | 'przedplata';
+  paymentMethod: 'przelew' | 'gotowka' | 'karta' | 'przedplata'; // Legacy
+
+  // Wpłaty (nowe)
+  payment1Amount?: number;
+  payment1Date?: string;
+  payment1Method?: 'przelew' | 'gotowka' | 'karta' | 'przedplata';
+  payment2Amount?: number;
+  payment2Date?: string;
+  payment2Method?: 'przelew' | 'gotowka' | 'karta' | 'przedplata';
+  payment3Amount?: number;
+  payment3Date?: string;
+  payment3Method?: 'przelew' | 'gotowka' | 'karta' | 'przedplata';
 
   // New management fields
   isWeek5: boolean;
