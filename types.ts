@@ -33,6 +33,14 @@ export interface Patient {
 
   // Patient status
   status?: 'active' | 'discharged';
+
+  // Discharge details
+  dischargeType?: 'completed' | 'resignation' | 'referral' | 'conditional_break' | 'expelled';
+  dischargeDate?: string;
+  refundAmount?: number;
+  refundDate?: string;
+  conditionalReturnDate?: string;
+  dischargeNotes?: string;
 }
 
 export interface Payment {
@@ -57,6 +65,22 @@ export interface QueuePatient {
   createdAt: string;
   status: 'waiting' | 'confirmed' | 'cancelled' | 'noshow';
 }
+
+// Discharge type labels
+export const DISCHARGE_TYPE_LABELS: Record<string, string> = {
+  completed: 'Zakończenie terapii',
+  resignation: 'Rezygnacja z terapii',
+  referral: 'Skierowanie do opieki specjalistycznej',
+  conditional_break: 'Przerwa warunkowa',
+  expelled: 'Wydalony',
+};
+
+// Is discharge type = interrupted therapy (not completed)?
+export const isInterruptedTherapy = (patient: Patient): boolean => {
+  return patient.status === 'discharged' &&
+    !!patient.dischargeType &&
+    patient.dischargeType !== 'completed';
+};
 
 // Derived property for amount due
 export const getAmountDue = (patient: Patient): number => {

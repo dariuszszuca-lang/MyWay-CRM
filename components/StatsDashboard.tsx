@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { Patient, formatCurrency, getAmountDue, normalizeVoivodeship } from '../types';
+import { Patient, formatCurrency, getAmountDue, normalizeVoivodeship, isInterruptedTherapy, DISCHARGE_TYPE_LABELS } from '../types';
 import { generateStatsPDF, StatsData } from '../services/pdfGenerator';
-import { Download, Users, Wallet, AlertTriangle, TrendingUp, Calendar } from 'lucide-react';
+import { Download, Users, Wallet, AlertTriangle, TrendingUp, Calendar, RotateCcw, UserX } from 'lucide-react';
 
 interface StatsDashboardProps {
   patients: Patient[];
@@ -73,7 +73,18 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
     const unpaidCount = filtered.filter(p => getAmountDue(p) > 0).length;
     const collectionRate = totalRevenue > 0 ? (totalCollected / totalRevenue) * 100 : 0;
 
-    return { active, discharged, totalRevenue, totalCollected, totalOutstanding, unpaidCount, collectionRate };
+    // Refunds & interrupted therapy
+    const totalRefunds = filtered.reduce((s, p) => s + (p.refundAmount || 0), 0);
+    const netRevenue = totalCollected - totalRefunds;
+    const interruptedCount = filtered.filter(p => isInterruptedTherapy(p)).length;
+    const interruptedByType = {
+      resignation: filtered.filter(p => p.dischargeType === 'resignation').length,
+      referral: filtered.filter(p => p.dischargeType === 'referral').length,
+      conditional_break: filtered.filter(p => p.dischargeType === 'conditional_break').length,
+      expelled: filtered.filter(p => p.dischargeType === 'expelled').length,
+    };
+
+    return { active, discharged, totalRevenue, totalCollected, totalOutstanding, unpaidCount, collectionRate, totalRefunds, netRevenue, interruptedCount, interruptedByType };
   }, [filtered]);
 
   // Package breakdown
@@ -221,7 +232,7 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
@@ -271,6 +282,38 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
           <div className="text-2xl font-bold text-red-600">{formatCurrency(stats.totalOutstanding)}</div>
           <div className="text-xs text-gray-400 mt-1">
             nieopłaconych: {stats.unpaidCount}
+          </div>
+        </div>
+
+        {/* Refunds KPI */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+              <RotateCcw className="w-4 h-4 text-orange-600" />
+            </div>
+            <span className="text-xs font-semibold text-gray-500 uppercase">Zwroty</span>
+          </div>
+          <div className="text-2xl font-bold text-orange-600">{formatCurrency(stats.totalRefunds)}</div>
+          <div className="text-xs text-gray-400 mt-1">
+            przychód netto: <span className="font-semibold text-gray-700">{formatCurrency(stats.netRevenue)}</span>
+          </div>
+        </div>
+
+        {/* Interrupted therapy KPI */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+              <UserX className="w-4 h-4 text-purple-600" />
+            </div>
+            <span className="text-xs font-semibold text-gray-500 uppercase">Przerwane terapie</span>
+          </div>
+          <div className="text-3xl font-bold text-gray-900">{stats.interruptedCount}</div>
+          <div className="text-xs text-gray-400 mt-1">
+            {stats.interruptedByType.resignation > 0 && `rezygnacje: ${stats.interruptedByType.resignation} `}
+            {stats.interruptedByType.referral > 0 && `skierowania: ${stats.interruptedByType.referral} `}
+            {stats.interruptedByType.conditional_break > 0 && `przerwy: ${stats.interruptedByType.conditional_break} `}
+            {stats.interruptedByType.expelled > 0 && `wydaleni: ${stats.interruptedByType.expelled}`}
+            {stats.interruptedCount === 0 && 'brak'}
           </div>
         </div>
       </div>
@@ -353,16 +396,18 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
             </div>
           </div>
 
-          <div className="mt-6 pt-4 border-t border-gray-100 grid grid-cols-2 gap-4">
+          <div className="mt-6 pt-4 border-t border-gray-100 grid grid-cols-3 gap-4">
             <div className="text-center">
-              <div className="text-2xl font-bold text-gray-900">{formatCurrency(stats.totalRevenue)}</div>
-              <div className="text-xs text-gray-500">Przychód ogółem</div>
+              <div className="text-2xl font-bold text-gray-900">{formatCurrency(stats.totalCollected)}</div>
+              <div className="text-xs text-gray-500">Wpłaty brutto</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-gray-900">
-                {filtered.length > 0 ? formatCurrency(stats.totalCollected / filtered.length) : '-'}
-              </div>
-              <div className="text-xs text-gray-500">Śr. wpłata na pacjenta</div>
+              <div className="text-2xl font-bold text-orange-600">{formatCurrency(stats.totalRefunds)}</div>
+              <div className="text-xs text-gray-500">Zwroty</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-700">{formatCurrency(stats.netRevenue)}</div>
+              <div className="text-xs text-gray-500">Przychód netto</div>
             </div>
           </div>
         </div>

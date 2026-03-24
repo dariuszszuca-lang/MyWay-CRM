@@ -274,31 +274,60 @@ const App: React.FC = () => {
     }
   };
 
-  // Discharge patient → send farewell email
-  const handleDischargePatient = async (patient: Patient) => {
-    if (!window.confirm(`Czy na pewno chcesz wypisać ${patient.firstName} ${patient.lastName}? Zostanie wysłany mail pożegnalny.`)) {
-      return;
-    }
-
+  // Discharge patient → update status + optional farewell email
+  const handleDischargePatient = async (patient: Patient, dischargeData: {
+    dischargeType: 'completed' | 'resignation' | 'referral' | 'conditional_break' | 'expelled';
+    dischargeDate: string;
+    refundAmount?: number;
+    refundDate?: string;
+    conditionalReturnDate?: string;
+    dischargeNotes?: string;
+  }) => {
     try {
-      // 1. Update status in Firestore
-      const patientRef = doc(db, "patients", patient.id);
-      await updateDoc(patientRef, { status: 'discharged' });
+      // 1. Build update payload
+      const updatePayload: Record<string, any> = {
+        status: 'discharged',
+        dischargeType: dischargeData.dischargeType,
+        dischargeDate: dischargeData.dischargeDate,
+      };
+      if (dischargeData.refundAmount !== undefined && dischargeData.refundAmount > 0) {
+        updatePayload.refundAmount = dischargeData.refundAmount;
+      }
+      if (dischargeData.refundDate) {
+        updatePayload.refundDate = dischargeData.refundDate;
+      }
+      if (dischargeData.conditionalReturnDate) {
+        updatePayload.conditionalReturnDate = dischargeData.conditionalReturnDate;
+      }
+      if (dischargeData.dischargeNotes) {
+        updatePayload.dischargeNotes = dischargeData.dischargeNotes;
+      }
 
-      // 2. Send farewell email (if email exists)
-      if (patient.email) {
+      // 2. Update Firestore
+      const patientRef = doc(db, "patients", patient.id);
+      await updateDoc(patientRef, updatePayload);
+
+      // 3. Send farewell email ONLY for completed therapy
+      if (dischargeData.dischargeType === 'completed' && patient.email) {
         const result = await dischargePatientEmail({
           email: patient.email,
           firstName: patient.firstName,
           package: patient.package,
         });
         if (result) {
-          alert(`✅ ${patient.firstName} wypisany. Mail pożegnalny wysłany.`);
+          alert(`✅ ${patient.firstName} wypisany (zakończenie terapii). Mail pożegnalny wysłany.`);
         } else {
           alert(`⚠️ ${patient.firstName} wypisany, ale problem z wysyłką maila.`);
         }
       } else {
-        alert(`✅ ${patient.firstName} wypisany (brak e-mail — mail nie wysłany).`);
+        const typeLabels: Record<string, string> = {
+          completed: 'Zakończenie terapii',
+          resignation: 'Rezygnacja z terapii',
+          referral: 'Skierowanie do opieki specjalistycznej',
+          conditional_break: 'Przerwa warunkowa',
+          expelled: 'Wydalony',
+        };
+        alert(`✅ ${patient.firstName} wypisany — ${typeLabels[dischargeData.dischargeType]}.`);
       }
     } catch (err) {
       alert("Błąd podczas wypisywania pacjenta.");

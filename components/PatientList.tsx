@@ -1,21 +1,39 @@
 import React, { useState, useMemo } from 'react';
-import { Patient, formatCurrency, getAmountDue, normalizeVoivodeship } from '../types';
-import { FileText, User, ScrollText, MessageCircle, CheckSquare, Square, Pencil, Trash2, Search, Wallet, X, CheckCircle, MapPin, Calendar, CreditCard, LogOut, Download } from 'lucide-react';
+import { Patient, formatCurrency, getAmountDue, normalizeVoivodeship, DISCHARGE_TYPE_LABELS, isInterruptedTherapy } from '../types';
+import { FileText, User, ScrollText, MessageCircle, CheckSquare, Square, Pencil, Trash2, Search, Wallet, X, CheckCircle, MapPin, Calendar, CreditCard, LogOut, Download, AlertTriangle, Clock, ArrowRight } from 'lucide-react';
 import { generateContract, generatePatientCard, generateRegulations, generateFilteredListPDF } from '../services/pdfGenerator';
 import PatientForm from './PatientForm';
+
+interface DischargeData {
+  dischargeType: 'completed' | 'resignation' | 'referral' | 'conditional_break' | 'expelled';
+  dischargeDate: string;
+  refundAmount?: number;
+  refundDate?: string;
+  conditionalReturnDate?: string;
+  dischargeNotes?: string;
+}
 
 interface PatientListProps {
   patients: Patient[];
   onUpdatePatient: (patient: Patient) => void;
   onDeletePatient: (id: string) => void;
-  onDischargePatient: (patient: Patient) => void;
+  onDischargePatient: (patient: Patient, dischargeData: DischargeData) => void;
 }
 
 const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, onDeletePatient, onDischargePatient }) => {
   const [filterPackage, setFilterPackage] = useState<'all' | '1' | '2' | '3' | 'interwencyjna' | 'vip'>('all');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'discharged'>('active');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'discharged' | 'interrupted'>('active');
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Discharge modal state
+  const [dischargeModalPatient, setDischargeModalPatient] = useState<Patient | null>(null);
+  const [dischargeType, setDischargeType] = useState<DischargeData['dischargeType']>('completed');
+  const [dischargeDate, setDischargeDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [dischargeRefundAmount, setDischargeRefundAmount] = useState<number>(0);
+  const [dischargeRefundDate, setDischargeRefundDate] = useState<string>('');
+  const [dischargeConditionalReturnDate, setDischargeConditionalReturnDate] = useState<string>('');
+  const [dischargeNotes, setDischargeNotes] = useState<string>('');
 
   // New filters
   const [filterVoivodeship, setFilterVoivodeship] = useState<string>('all');
@@ -87,7 +105,8 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                            (filterPaymentStatus === 'unpaid' && amountDue > 0);
     const matchesStatus = filterStatus === 'all' ||
                           (filterStatus === 'active' && p.status !== 'discharged') ||
-                          (filterStatus === 'discharged' && p.status === 'discharged');
+                          (filterStatus === 'discharged' && p.status === 'discharged') ||
+                          (filterStatus === 'interrupted' && isInterruptedTherapy(p));
 
     return matchesPackage && matchesSearch && matchesVoivodeship && matchesDateRange && matchesPayment && matchesStatus;
   });
@@ -164,6 +183,43 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
     } finally {
       setIsExportingPDF(false);
     }
+  };
+
+  // Discharge modal handlers
+  const openDischargeModal = (patient: Patient) => {
+    setDischargeModalPatient(patient);
+    setDischargeType('completed');
+    setDischargeDate(new Date().toISOString().split('T')[0]);
+    setDischargeRefundAmount(0);
+    setDischargeRefundDate('');
+    setDischargeConditionalReturnDate('');
+    setDischargeNotes('');
+  };
+
+  const closeDischargeModal = () => {
+    setDischargeModalPatient(null);
+  };
+
+  const handleConfirmDischarge = () => {
+    if (!dischargeModalPatient) return;
+
+    const data: DischargeData = {
+      dischargeType,
+      dischargeDate,
+    };
+    if ((dischargeType === 'resignation' || dischargeType === 'referral') && dischargeRefundAmount > 0) {
+      data.refundAmount = dischargeRefundAmount;
+      data.refundDate = dischargeRefundDate || dischargeDate;
+    }
+    if (dischargeType === 'conditional_break' && dischargeConditionalReturnDate) {
+      data.conditionalReturnDate = dischargeConditionalReturnDate;
+    }
+    if (dischargeNotes.trim()) {
+      data.dischargeNotes = dischargeNotes.trim();
+    }
+
+    onDischargePatient(dischargeModalPatient, data);
+    closeDischargeModal();
   };
 
   if (patients.length === 0) {
@@ -256,6 +312,172 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
         </div>
       )}
 
+      {/* Modal for Discharge */}
+      {dischargeModalPatient && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 my-8 animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Wypis pacjenta</h3>
+              <button onClick={closeDischargeModal} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+              <span className="text-sm text-gray-500">Pacjent:</span>
+              <span className="ml-2 font-bold text-gray-900">{dischargeModalPatient.firstName} {dischargeModalPatient.lastName}</span>
+            </div>
+
+            {/* Discharge type selection */}
+            <div className="mb-4">
+              <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Powód wypisu</label>
+              <div className="space-y-2">
+                {([
+                  { value: 'completed', label: 'Zakończenie terapii', icon: '✅', color: 'green', desc: 'Terapia zakończona planowo — mail pożegnalny' },
+                  { value: 'resignation', label: 'Rezygnacja z terapii', icon: '🚪', color: 'orange', desc: 'Pacjent rezygnuje — opcjonalny zwrot' },
+                  { value: 'referral', label: 'Skierowanie do opieki specjalistycznej', icon: '🏥', color: 'blue', desc: 'Przekierowanie do innej placówki — opcjonalny zwrot' },
+                  { value: 'conditional_break', label: 'Przerwa warunkowa', icon: '⏸️', color: 'amber', desc: 'Tymczasowe opuszczenie z planowanym powrotem' },
+                  { value: 'expelled', label: 'Wydalony', icon: '⛔', color: 'red', desc: 'Naruszenie regulaminu / wydalenie' },
+                ] as const).map((opt) => (
+                  <label
+                    key={opt.value}
+                    className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
+                      dischargeType === opt.value
+                        ? opt.color === 'green' ? 'border-green-500 bg-green-50'
+                        : opt.color === 'orange' ? 'border-orange-500 bg-orange-50'
+                        : opt.color === 'blue' ? 'border-blue-500 bg-blue-50'
+                        : opt.color === 'amber' ? 'border-amber-500 bg-amber-50'
+                        : 'border-red-500 bg-red-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="dischargeType"
+                      value={opt.value}
+                      checked={dischargeType === opt.value}
+                      onChange={() => setDischargeType(opt.value)}
+                      className="mt-1"
+                    />
+                    <div>
+                      <div className="font-semibold text-sm text-gray-900">{opt.icon} {opt.label}</div>
+                      <div className="text-xs text-gray-500">{opt.desc}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Dynamic fields based on type */}
+            <div className="space-y-3 mb-4">
+              {/* Date — always shown */}
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                  {dischargeType === 'conditional_break' ? 'Data wyjścia' : dischargeType === 'expelled' ? 'Data wydalenia' : 'Data wypisu'}
+                </label>
+                <input
+                  type="date"
+                  value={dischargeDate}
+                  onChange={(e) => setDischargeDate(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white text-black"
+                />
+              </div>
+
+              {/* Refund fields — resignation & referral */}
+              {(dischargeType === 'resignation' || dischargeType === 'referral') && (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Kwota zwrotu (PLN)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={dischargeRefundAmount}
+                      onChange={(e) => setDischargeRefundAmount(Number(e.target.value))}
+                      className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none font-mono bg-white text-black"
+                      placeholder="0 = brak zwrotu"
+                    />
+                  </div>
+                  {dischargeRefundAmount > 0 && (
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Data zwrotu</label>
+                      <input
+                        type="date"
+                        value={dischargeRefundDate}
+                        onChange={(e) => setDischargeRefundDate(e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white text-black"
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Conditional break — return date */}
+              {dischargeType === 'conditional_break' && (
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Planowana data powrotu</label>
+                  <input
+                    type="date"
+                    value={dischargeConditionalReturnDate}
+                    onChange={(e) => setDischargeConditionalReturnDate(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-black"
+                  />
+                </div>
+              )}
+
+              {/* Notes — always available, prominent for expelled */}
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                  Uwagi {dischargeType === 'expelled' && <span className="text-red-500">*</span>}
+                </label>
+                <textarea
+                  value={dischargeNotes}
+                  onChange={(e) => setDischargeNotes(e.target.value)}
+                  placeholder={dischargeType === 'expelled' ? 'Powód wydalenia (wymagane)...' : 'Opcjonalne uwagi...'}
+                  className="w-full h-20 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none resize-none bg-white text-black"
+                />
+              </div>
+            </div>
+
+            {/* Summary */}
+            <div className="p-3 bg-gray-50 rounded-lg mb-4 text-sm text-gray-700">
+              <div className="font-semibold mb-1">Podsumowanie:</div>
+              <ul className="space-y-1 text-xs">
+                <li>Status pacjenta zmieni się na <strong>nieaktywny</strong></li>
+                {dischargeType !== 'completed' && (
+                  <li>Raportowany jako <strong className="text-orange-600">przerwana terapia</strong></li>
+                )}
+                {dischargeType === 'completed' && (
+                  <li>Zostanie wysłany <strong className="text-green-600">mail pożegnalny</strong></li>
+                )}
+                {(dischargeType === 'resignation' || dischargeType === 'referral') && dischargeRefundAmount > 0 && (
+                  <li>Zwrot: <strong className="text-red-600">{formatCurrency(dischargeRefundAmount)}</strong> — odliczony od przychodów</li>
+                )}
+                {dischargeType === 'conditional_break' && dischargeConditionalReturnDate && (
+                  <li>Planowany powrót: <strong className="text-amber-600">{dischargeConditionalReturnDate}</strong></li>
+                )}
+              </ul>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleConfirmDischarge}
+                disabled={dischargeType === 'expelled' && !dischargeNotes.trim()}
+                className="flex-1 bg-purple-600 text-white py-2.5 rounded-lg font-bold hover:bg-purple-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <LogOut className="w-4 h-4" />
+                Wypisz pacjenta
+              </button>
+              <button
+                onClick={closeDischargeModal}
+                className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-lg font-bold hover:bg-gray-200 transition-colors"
+              >
+                Anuluj
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Bar: Search & Filters */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 space-y-4">
 
@@ -337,6 +559,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
               {([
                 { value: 'active', label: 'Aktywni' },
                 { value: 'discharged', label: 'Wypisani' },
+                { value: 'interrupted', label: 'Przerwane' },
                 { value: 'all', label: 'Wszyscy' }
               ] as const).map((item) => (
                 <button
@@ -346,6 +569,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                     filterStatus === item.value
                       ? item.value === 'active' ? 'bg-teal-600 text-white shadow-sm'
                         : item.value === 'discharged' ? 'bg-purple-600 text-white shadow-sm'
+                        : item.value === 'interrupted' ? 'bg-orange-500 text-white shadow-sm'
                         : 'bg-gray-600 text-white shadow-sm'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
@@ -519,9 +743,19 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                          <div>
                            <span className="font-bold text-gray-900 text-base">{patient.firstName} {patient.lastName}</span>
                            {patient.status === 'discharged' && (
-                             <span className="ml-2 inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                             <span className={`ml-2 inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full border ${
+                               isInterruptedTherapy(patient)
+                                 ? 'bg-orange-100 text-orange-800 border-orange-200'
+                                 : 'bg-purple-100 text-purple-800 border-purple-200'
+                             }`}>
                                <LogOut className="w-3 h-3" />
-                               Wypisany
+                               {patient.dischargeType ? DISCHARGE_TYPE_LABELS[patient.dischargeType] || 'Wypisany' : 'Wypisany'}
+                             </span>
+                           )}
+                           {patient.dischargeType === 'conditional_break' && patient.conditionalReturnDate && (
+                             <span className="ml-1 inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                               <Clock className="w-3 h-3" />
+                               Powrót: {patient.conditionalReturnDate}
                              </span>
                            )}
                          </div>
@@ -667,13 +901,18 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                     </button>
                     {patient.status !== 'discharged' && (
                       <button
-                        onClick={() => onDischargePatient(patient)}
+                        onClick={() => openDischargeModal(patient)}
                         className="w-full justify-center inline-flex items-center gap-1 px-3 py-1.5 border border-purple-400 text-purple-600 rounded hover:bg-purple-50 text-xs font-medium transition-colors"
-                        title="Wypisz pacjenta → wysyła mail pożegnalny"
+                        title="Wypisz pacjenta"
                       >
                         <LogOut className="w-3 h-3" />
                         Wypisz
                       </button>
+                    )}
+                    {patient.refundAmount && patient.refundAmount > 0 && (
+                      <div className="text-xs text-red-600 font-medium mt-1 text-center">
+                        Zwrot: {formatCurrency(patient.refundAmount)}
+                      </div>
                     )}
                   </td>
                 </tr>
