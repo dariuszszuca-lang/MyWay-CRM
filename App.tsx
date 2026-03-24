@@ -335,6 +335,29 @@ const App: React.FC = () => {
     }
   };
 
+  // Reactivate patient (e.g. return from conditional break)
+  const handleReactivatePatient = async (patient: Patient) => {
+    if (!window.confirm(`Czy na pewno chcesz przywrócić ${patient.firstName} ${patient.lastName} do aktywnych pacjentów?`)) {
+      return;
+    }
+    try {
+      const patientRef = doc(db, "patients", patient.id);
+      await updateDoc(patientRef, {
+        status: 'active',
+        dischargeType: null,
+        dischargeDate: null,
+        refundAmount: null,
+        refundDate: null,
+        conditionalReturnDate: null,
+        dischargeNotes: null,
+      });
+      alert(`✅ ${patient.firstName} ${patient.lastName} przywrócony do aktywnych pacjentów.`);
+    } catch (err) {
+      alert("Błąd podczas przywracania pacjenta.");
+      console.error(err);
+    }
+  };
+
   // Admit patient: queue → form with prefill
   const handleAdmitPatient = (queuePatient: QueuePatient) => {
     setPrefillQueue(queuePatient);
@@ -539,6 +562,7 @@ const App: React.FC = () => {
                   onUpdatePatient={handleUpdatePatient}
                   onDeletePatient={handleDeletePatient}
                   onDischargePatient={handleDischargePatient}
+                  onReactivatePatient={handleReactivatePatient}
                 />
               </div>
             )}

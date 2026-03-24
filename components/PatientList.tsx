@@ -18,9 +18,10 @@ interface PatientListProps {
   onUpdatePatient: (patient: Patient) => void;
   onDeletePatient: (id: string) => void;
   onDischargePatient: (patient: Patient, dischargeData: DischargeData) => void;
+  onReactivatePatient: (patient: Patient) => void;
 }
 
-const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, onDeletePatient, onDischargePatient }) => {
+const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, onDeletePatient, onDischargePatient, onReactivatePatient }) => {
   const [filterPackage, setFilterPackage] = useState<'all' | '1' | '2' | '3' | 'interwencyjna' | 'vip'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'discharged' | 'interrupted'>('active');
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
@@ -907,6 +908,16 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                       >
                         <LogOut className="w-3 h-3" />
                         Wypisz
+                      </button>
+                    )}
+                    {patient.status === 'discharged' && (
+                      <button
+                        onClick={() => onReactivatePatient(patient)}
+                        className="w-full justify-center inline-flex items-center gap-1 px-3 py-1.5 border border-green-400 text-green-600 rounded hover:bg-green-50 text-xs font-medium transition-colors"
+                        title="Przywróć pacjenta do aktywnych"
+                      >
+                        <ArrowRight className="w-3 h-3" />
+                        Przywróć
                       </button>
                     )}
                     {patient.refundAmount && patient.refundAmount > 0 && (
