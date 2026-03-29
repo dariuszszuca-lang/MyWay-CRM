@@ -16,7 +16,7 @@ export interface Patient {
   treatmentEndDate: string; // Data zakończenia terapii
   
   // Financial
-  package: '1' | '2' | '3' | 'interwencyjna' | 'vip';
+  package: '1' | '2' | '3' | '6tyg' | '8tyg' | '6tyg_roz' | '8tyg_roz' | 'interwencyjna' | 'vip';
   totalAmount: number;
   amountPaid: number; // Legacy — suma wpłat (backwards compat)
   paymentDeadline: string;
@@ -56,7 +56,7 @@ export interface QueuePatient {
   lastName: string;
   phone: string;
   email: string;
-  package: '1' | '2' | '3' | 'interwencyjna' | 'vip';
+  package: '1' | '2' | '3' | '6tyg' | '8tyg' | '6tyg_roz' | '8tyg_roz' | 'interwencyjna' | 'vip';
   depositAmount: number;     // Wpłacona zaliczka
   depositDate: string;       // Data wpłaty zaliczki
   plannedStartDate: string;  // Planowany termin OD

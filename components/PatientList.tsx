@@ -22,7 +22,7 @@ interface PatientListProps {
 }
 
 const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, onDeletePatient, onDischargePatient, onReactivatePatient }) => {
-  const [filterPackage, setFilterPackage] = useState<'all' | '1' | '2' | '3' | 'interwencyjna' | 'vip'>('all');
+  const [filterPackage, setFilterPackage] = useState<'all' | '1' | '2' | '3' | '6tyg' | '8tyg' | '6tyg_roz' | '8tyg_roz' | 'interwencyjna' | 'vip'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'discharged' | 'interrupted'>('active');
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -158,7 +158,8 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
     try {
       const filterParts: string[] = [];
       if (filterPackage !== 'all') {
-        const pkgLabel = filterPackage === 'interwencyjna' ? 'Terapia interwencyjna' : filterPackage === 'vip' ? 'Grupa VIP' : `Pakiet ${filterPackage}`;
+        const pkgNameMap: Record<string, string> = { '1': 'Pakiet 1', '2': 'Pakiet 2', '3': 'Pakiet 3', '6tyg': '6 tygodni', '8tyg': '8 tygodni', '6tyg_roz': '6 tyg. rozszerzony', '8tyg_roz': '8 tyg. rozszerzony', 'interwencyjna': 'Terapia interwencyjna', 'vip': 'Grupa VIP' };
+        const pkgLabel = pkgNameMap[filterPackage] || filterPackage;
         filterParts.push(pkgLabel);
       }
       if (filterStatus === 'active') filterParts.push('Aktywni');
@@ -529,6 +530,10 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                 { value: '1', label: '1' },
                 { value: '2', label: '2' },
                 { value: '3', label: '3' },
+                { value: '6tyg', label: '6tyg' },
+                { value: '8tyg', label: '8tyg' },
+                { value: '6tyg_roz', label: '6t.R' },
+                { value: '8tyg_roz', label: '8t.R' },
                 { value: 'interwencyjna', label: 'Interw.' },
                 { value: 'vip', label: 'VIP' },
               ] as const).map((pkg) => (
@@ -797,13 +802,15 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                     <span className={`inline-block px-2 py-1 rounded text-xs font-bold mb-2 ${
                       patient.package === '3' ? 'bg-purple-100 text-purple-800' :
                       patient.package === '2' ? 'bg-blue-100 text-blue-800' :
+                      patient.package === '6tyg' ? 'bg-cyan-100 text-cyan-800' :
+                      patient.package === '8tyg' ? 'bg-emerald-100 text-emerald-800' :
+                      patient.package === '6tyg_roz' ? 'bg-indigo-100 text-indigo-800' :
+                      patient.package === '8tyg_roz' ? 'bg-fuchsia-100 text-fuchsia-800' :
                       patient.package === 'interwencyjna' ? 'bg-amber-100 text-amber-800' :
                       patient.package === 'vip' ? 'bg-rose-100 text-rose-800' :
                       'bg-teal-100 text-teal-800'
                     }`}>
-                      {patient.package === 'interwencyjna' ? 'Terapia interwencyjna' :
-                       patient.package === 'vip' ? 'Grupa VIP' :
-                       `Pakiet ${patient.package}`}
+                      {{ '1': 'Pakiet 1', '2': 'Pakiet 2', '3': 'Pakiet 3', '6tyg': '6 tygodni', '8tyg': '8 tygodni', '6tyg_roz': '6 tyg. rozszerzony', '8tyg_roz': '8 tyg. rozszerzony', 'interwencyjna': 'Terapia interwencyjna', 'vip': 'Grupa VIP' }[patient.package] || patient.package}
                     </span>
                     <div className="text-xs text-gray-600">
                       <span className="font-semibold">Start:</span> {patient.treatmentStartDate}

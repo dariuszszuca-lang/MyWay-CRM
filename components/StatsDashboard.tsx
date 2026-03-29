@@ -89,7 +89,7 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
 
   // Package breakdown
   const packages = useMemo(() => {
-    return (['1', '2', '3', 'interwencyjna', 'vip'] as const).map(pkg => {
+    return (['1', '2', '3', '6tyg', '8tyg', '6tyg_roz', '8tyg_roz', 'interwencyjna', 'vip'] as const).map(pkg => {
       const list = filtered.filter(p => p.package === pkg);
       return {
         pkg,
@@ -159,8 +159,8 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
     }
   };
 
-  const pkgColors: Record<string, string> = { '1': 'teal', '2': 'blue', '3': 'purple', 'interwencyjna': 'amber', 'vip': 'rose' };
-  const pkgNames: Record<string, string> = { '1': 'Pakiet 1', '2': 'Pakiet 2', '3': 'Pakiet 3', 'interwencyjna': 'Terapia interwencyjna', 'vip': 'Grupa VIP' };
+  const pkgColors: Record<string, string> = { '1': 'teal', '2': 'blue', '3': 'purple', '6tyg': 'cyan', '8tyg': 'emerald', '6tyg_roz': 'indigo', '8tyg_roz': 'fuchsia', 'interwencyjna': 'amber', 'vip': 'rose' };
+  const pkgNames: Record<string, string> = { '1': 'Pakiet 1', '2': 'Pakiet 2', '3': 'Pakiet 3', '6tyg': '6 tygodni', '8tyg': '8 tygodni', '6tyg_roz': '6 tyg. rozszerzony', '8tyg_roz': '8 tyg. rozszerzony', 'interwencyjna': 'Terapia interwencyjna', 'vip': 'Grupa VIP' };
 
   if (patients.length === 0) {
     return (

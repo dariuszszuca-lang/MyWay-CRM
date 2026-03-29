@@ -46,6 +46,10 @@ const CAMPAIGN_IDS = {
   "1": "iccz2",  // PAKIET 1
   "2": "fzbxf",  // PAKIET 2
   "3": "ij5Ot",  // PAKIET 3
+  "6tyg": "iccz2",  // 6 TYGODNI — jak Pakiet 1
+  "8tyg": "iccz2",  // 8 TYGODNI — jak Pakiet 1
+  "6tyg_roz": "ij5Ot",  // 6 TYGODNI ROZSZERZONY — jak Pakiet 3
+  "8tyg_roz": "ij5Ot",  // 8 TYGODNI ROZSZERZONY — jak Pakiet 3
   "interwencyjna": "fuJ9s",  // TERAPIA INTERWENCYJNA
   "vip": "fuJwg",  // GRUPA VIP
 };
@@ -133,6 +137,10 @@ function getWelcomeEmailHtml(firstName, packageType, startDate, endDate) {
     "1": "Pakiet 1 — Podstawowy (28 dni)",
     "2": "Pakiet 2 — Rozszerzony",
     "3": "Pakiet 3 — Stacjonarny (4+1 tygodni)",
+    "6tyg": "Pakiet 6 tygodni",
+    "8tyg": "Pakiet 8 tygodni",
+    "6tyg_roz": "Pakiet 6 tygodni rozszerzony",
+    "8tyg_roz": "Pakiet 8 tygodni rozszerzony",
     "interwencyjna": "Terapia interwencyjna",
     "vip": "Grupa VIP",
   };
@@ -186,7 +194,7 @@ function getWelcomeEmailHtml(firstName, packageType, startDate, endDate) {
       </table>
     </div>
 
-    ${packageType === "3" ? `
+    ${(packageType === "3" || packageType === "6tyg_roz" || packageType === "8tyg_roz") ? `
     <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:20px;margin:24px 0;">
       <h3 style="margin:0 0 12px;color:#7c3aed;font-size:16px;">🎁 Bonus w Twoim pakiecie</h3>
       <p style="font-size:14px;color:#555;line-height:1.6;margin:0;">
@@ -248,15 +256,19 @@ function getWelcomeEmailPlain(firstName, packageType, startDate) {
     "1": "Pakiet 1 — Podstawowy (28 dni)",
     "2": "Pakiet 2 — Rozszerzony",
     "3": "Pakiet 3 — Stacjonarny (4+1 tygodni)",
+    "6tyg": "Pakiet 6 tygodni",
+    "8tyg": "Pakiet 8 tygodni",
+    "6tyg_roz": "Pakiet 6 tygodni rozszerzony",
+    "8tyg_roz": "Pakiet 8 tygodni rozszerzony",
     "interwencyjna": "Terapia interwencyjna",
     "vip": "Grupa VIP",
   };
   const packageName = packageNames[packageType] || `Pakiet ${packageType}`;
-  return `Cześć ${firstName}!\n\nPotwierdzamy Twój termin w Ośrodku My Way.\n\nWariant terapii: ${packageName}\n${startDate ? `Data przyjazdu: ${startDate}\n` : ""}\nCo spakować:\n- Środki higieny osobistej\n- Ręcznik\n- Ubrania na min. 7 dni\n- Strój sportowy\n- Obuwie + klapki\n- Kurtka\n- Laptop i telefon\n- Dowód osobisty\n- Ulubione lub aktualnie czytane książki\n- Leki i suplementy (zapas + dawkowanie, przekaż terapeucie)\n- Papierosy (dostęp do sklepu ograniczony regulaminem)\n${packageType === "3" ? `\nBonus w Twoim pakiecie:\nTwój pakiet to 4+1 tygodni (4 tygodnie stacjonarnie + dodatkowy tydzień do wykorzystania w ciągu 6 miesięcy). Dodatkowo masz 20 konsultacji indywidualnych (online lub na miejscu).\n` : ""}\nMasz pytania? Dzwoń: 731 395 295\n\nDo zobaczenia!\nEkipa My Way\nosrodek-myway.pl`;
+  return `Cześć ${firstName}!\n\nPotwierdzamy Twój termin w Ośrodku My Way.\n\nWariant terapii: ${packageName}\n${startDate ? `Data przyjazdu: ${startDate}\n` : ""}\nCo spakować:\n- Środki higieny osobistej\n- Ręcznik\n- Ubrania na min. 7 dni\n- Strój sportowy\n- Obuwie + klapki\n- Kurtka\n- Laptop i telefon\n- Dowód osobisty\n- Ulubione lub aktualnie czytane książki\n- Leki i suplementy (zapas + dawkowanie, przekaż terapeucie)\n- Papierosy (dostęp do sklepu ograniczony regulaminem)\n${(packageType === "3" || packageType === "6tyg_roz" || packageType === "8tyg_roz") ? `\nBonus w Twoim pakiecie:\nTwój pakiet zawiera dodatkowe konsultacje indywidualne (online lub na miejscu).\n` : ""}\nMasz pytania? Dzwoń: 731 395 295\n\nDo zobaczenia!\nEkipa My Way\nosrodek-myway.pl`;
 }
 
 function getFarewellEmailHtml(firstName, packageType) {
-  const isPackage3 = packageType === "3";
+  const isPackage3 = packageType === "3" || packageType === "6tyg_roz" || packageType === "8tyg_roz";
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
 <body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,Helvetica,sans-serif;">
@@ -334,7 +346,7 @@ function getFarewellEmailHtml(firstName, packageType) {
 }
 
 function getFarewellEmailPlain(firstName, packageType) {
-  const isPackage3 = packageType === "3";
+  const isPackage3 = packageType === "3" || packageType === "6tyg_roz" || packageType === "8tyg_roz";
   return `Cześć ${firstName}!\n\nGratulacje — właśnie domykasz ważny rozdział!\n\nCo dalej:\n${isPackage3 ? "- 20 spotkań indywidualnych (online lub na miejscu)\n" : ""}- Grupa VIP z Krystianem Nagabą\n\nZostań z nami:\n- Zjazdy absolwentów — co sobotę 10:00-13:00 w ośrodku\n- Grupa na WhatsApp — nasza przestrzeń 24/7\n- Platforma edukacyjna: https://edu-myway.pl\n- Live z Krystianem — na naszych social mediach\n\nKsiążka: https://wygrajtrzezwezycie.pl\n\nGdyby działo się coś trudnego — dzwoń:\n536 598 821\n731 395 295\n\nŚciskamy!\nEkipa My Way\nosrodek-myway.pl`;
 }
 
