@@ -538,7 +538,7 @@ const App: React.FC = () => {
                     </button>
                   )}
                 </div>
-                <PatientForm onSubmit={handleAddPatient} prefillFromQueue={prefillQueue || undefined} />
+                <PatientForm onSubmit={handleAddPatient} prefillFromQueue={prefillQueue || undefined} allPatients={patients} />
               </div>
             )}
 

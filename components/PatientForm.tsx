@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Patient, Payment, QueuePatient, formatCurrency } from '../types';
-import { PlusCircle, Calculator, Save, X, Trash2 } from 'lucide-react';
+import { PlusCircle, Calculator, Save, X, Trash2, Search, UserCheck } from 'lucide-react';
 
 interface PatientFormProps {
   onSubmit: (patient: Patient) => void;
   initialData?: Patient;
   onCancel?: () => void;
   prefillFromQueue?: QueuePatient;
+  allPatients?: Patient[];
 }
 
 const defaultPatient: Omit<Patient, 'id'> = {
@@ -33,9 +34,67 @@ const defaultPatient: Omit<Patient, 'id'> = {
   notes: ''
 };
 
-const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCancel, prefillFromQueue }) => {
+const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCancel, prefillFromQueue, allPatients }) => {
   const [formData, setFormData] = useState<Omit<Patient, 'id'> | Patient>(defaultPatient);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [returningSearch, setReturningSearch] = useState('');
+  const [showReturningResults, setShowReturningResults] = useState(false);
+  const [returningPrefilled, setReturningPrefilled] = useState<string | null>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  // Filter discharged + VIP patients for returning search
+  const returningCandidates = (allPatients || []).filter(p =>
+    p.status === 'discharged' || p.package === 'vip'
+  );
+
+  const filteredReturning = returningSearch.length >= 2
+    ? returningCandidates.filter(p => {
+        const q = returningSearch.toLowerCase();
+        return (
+          p.firstName.toLowerCase().includes(q) ||
+          p.lastName.toLowerCase().includes(q) ||
+          p.pesel?.includes(q) ||
+          `${p.firstName} ${p.lastName}`.toLowerCase().includes(q)
+        );
+      })
+    : [];
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowReturningResults(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelectReturning = (patient: Patient) => {
+    const previousStay = patient.treatmentStartDate && patient.treatmentEndDate
+      ? `Pobyt ponowny — poprzedni: ${patient.treatmentStartDate} – ${patient.treatmentEndDate}`
+      : 'Pobyt ponowny';
+    const prevNotes = patient.notes ? `${patient.notes}\n${previousStay}` : previousStay;
+
+    setFormData({
+      ...defaultPatient,
+      firstName: patient.firstName,
+      lastName: patient.lastName,
+      pesel: patient.pesel,
+      birthDate: patient.birthDate,
+      idSeries: patient.idSeries,
+      address: patient.address,
+      voivodeship: patient.voivodeship,
+      phone: patient.phone,
+      email: patient.email,
+      applicationDate: new Date().toISOString().split('T')[0],
+      notes: prevNotes,
+    });
+    setPayments([]);
+    setReturningSearch('');
+    setShowReturningResults(false);
+    setReturningPrefilled(`${patient.firstName} ${patient.lastName}`);
+  };
 
   useEffect(() => {
     if (initialData) {
@@ -134,6 +193,89 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
       </div>
       
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Returning patient search — only in create mode */}
+        {!isEditing && allPatients && allPatients.length > 0 && (
+          <div ref={searchRef} className="relative">
+            <h3 className="text-sm font-semibold text-amber-600 uppercase tracking-wider mb-3 border-b border-amber-200 pb-2 flex items-center gap-2">
+              <UserCheck className="w-4 h-4" />
+              Pacjent powracający
+            </h3>
+            {returningPrefilled ? (
+              <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                <UserCheck className="w-5 h-5 text-amber-600" />
+                <span className="text-sm font-medium text-amber-800">
+                  Dane pobrane z bazy: <strong>{returningPrefilled}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReturningPrefilled(null);
+                    setFormData(defaultPatient);
+                    setPayments([]);
+                  }}
+                  className="ml-auto text-amber-500 hover:text-red-500 transition"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Wyszukaj wypisanego pacjenta (imię, nazwisko lub PESEL)..."
+                    value={returningSearch}
+                    onChange={(e) => {
+                      setReturningSearch(e.target.value);
+                      setShowReturningResults(true);
+                    }}
+                    onFocus={() => setShowReturningResults(true)}
+                    className="pl-10 p-2.5 border border-amber-300 rounded-lg w-full bg-white text-black placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all shadow-sm"
+                  />
+                </div>
+                {showReturningResults && returningSearch.length >= 2 && (
+                  <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                    {filteredReturning.length === 0 ? (
+                      <div className="px-4 py-3 text-sm text-gray-500">Brak wyników</div>
+                    ) : (
+                      filteredReturning.map(p => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => handleSelectReturning(p)}
+                          className="w-full text-left px-4 py-3 hover:bg-amber-50 transition border-b border-gray-100 last:border-0"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="font-semibold text-gray-900">{p.firstName} {p.lastName}</span>
+                              <span className="text-xs text-gray-500 ml-2">PESEL: {p.pesel}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {p.package === 'vip' && (
+                                <span className="text-xs bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-medium">VIP</span>
+                              )}
+                              {p.status === 'discharged' && (
+                                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
+                                  Wypisany {p.dischargeDate || ''}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-xs text-gray-400 mt-1">
+                            {p.phone} · {p.email}
+                            {p.treatmentStartDate && ` · Ostatni pobyt: ${p.treatmentStartDate} – ${p.treatmentEndDate || '?'}`}
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
         {/* Section 1: Personal */}
         <div>
           <h3 className="text-sm font-semibold text-teal-600 uppercase tracking-wider mb-4 border-b pb-2">Dane Personalne</h3>
