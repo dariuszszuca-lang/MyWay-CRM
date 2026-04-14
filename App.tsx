@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Patient, QueuePatient } from './types';
+import { Patient, QueuePatient, getAmountDue, formatCurrency } from './types';
 import PatientForm from './components/PatientForm';
 import PatientList from './components/PatientList';
 import QueueForm from './components/QueueForm';
 import QueueList from './components/QueueList';
 import Login from './components/Login';
 import StatsDashboard from './components/StatsDashboard';
-import { Activity, Users, Download, Cloud, RefreshCw, LogOut, Clock, BarChart3 } from 'lucide-react';
+import { Activity, Users, Download, Cloud, RefreshCw, LogOut, Clock, BarChart3, AlertTriangle } from 'lucide-react';
 import { db, auth } from './firebaseConfig';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
@@ -509,6 +509,50 @@ const App: React.FC = () => {
             <span className="block sm:inline">{error}</span>
           </div>
         )}
+
+        {/* Payment Alert — 7 days before therapy end */}
+        {(() => {
+          const today = new Date();
+          const in7days = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+          const alerts = patients.filter(p => {
+            if (p.status === 'discharged' || !p.treatmentEndDate) return false;
+            const endDate = new Date(p.treatmentEndDate);
+            const due = getAmountDue(p);
+            return due > 0 && endDate <= in7days && endDate >= today;
+          });
+          if (alerts.length === 0) return null;
+          return (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="w-5 h-5 text-amber-600" />
+                <h3 className="font-bold text-amber-800 text-sm">
+                  Przypomnienie o płatnościach — terapia kończy się w ciągu 7 dni
+                </h3>
+              </div>
+              <div className="space-y-2">
+                {alerts.map(p => {
+                  const daysLeft = Math.ceil((new Date(p.treatmentEndDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                  return (
+                    <div key={p.id} className="flex items-center justify-between bg-white rounded-lg p-3 border border-amber-100">
+                      <div>
+                        <span className="font-semibold text-gray-800">{p.firstName} {p.lastName}</span>
+                        <span className="text-gray-400 mx-2">·</span>
+                        <span className="text-sm text-gray-500">koniec: {p.treatmentEndDate}</span>
+                        <span className="text-gray-400 mx-2">·</span>
+                        <span className="text-sm text-amber-600 font-medium">
+                          {daysLeft === 0 ? 'dziś!' : daysLeft === 1 ? 'jutro!' : `za ${daysLeft} dni`}
+                        </span>
+                      </div>
+                      <span className="text-red-600 font-bold text-sm">
+                        Do zapłaty: {formatCurrency(getAmountDue(p))}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
 
         {dataLoading ? (
           <div className="flex justify-center items-center h-64">

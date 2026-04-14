@@ -734,3 +734,106 @@ exports.createPatientFromCRM = functions
       res.status(500).json({ success: false, error: error.message });
     }
   });
+
+// =======================================================================
+// PAYMENT ALERT — codzienne sprawdzanie, 7 dni przed końcem terapii
+// =======================================================================
+
+exports.paymentAlertDaily = functions.pubsub
+  .schedule("every day 08:00")
+  .timeZone("Europe/Warsaw")
+  .onRun(async () => {
+    const ALERT_EMAIL = "mywaymarcin@gmail.com";
+    const DAYS_BEFORE = 7;
+
+    const today = new Date();
+    const alertDate = new Date(today.getTime() + DAYS_BEFORE * 24 * 60 * 60 * 1000);
+    const todayStr = today.toISOString().split("T")[0];
+    const alertStr = alertDate.toISOString().split("T")[0];
+
+    try {
+      const snapshot = await admin.firestore().collection("patients").get();
+      const alerts = [];
+
+      snapshot.forEach((doc) => {
+        const p = doc.data();
+        if (p.status === "discharged" || !p.treatmentEndDate) return;
+
+        const endDate = p.treatmentEndDate;
+        if (endDate < todayStr || endDate > alertStr) return;
+
+        // Calculate amount due
+        const totalPaid = p.amountPaid || 0;
+        const totalAmount = p.totalAmount || 0;
+        const servicesTotal = (p.additionalServices || []).reduce((s, svc) => s + (svc.amount || 0), 0);
+        const due = totalAmount + servicesTotal - totalPaid;
+
+        if (due > 0) {
+          const daysLeft = Math.ceil((new Date(endDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          alerts.push({
+            name: `${p.firstName} ${p.lastName}`,
+            endDate: endDate,
+            daysLeft: daysLeft,
+            due: due,
+            phone: p.phone || "",
+          });
+        }
+      });
+
+      if (alerts.length === 0) {
+        console.log("No payment alerts today.");
+        return null;
+      }
+
+      // Build email
+      const rows = alerts
+        .map(
+          (a) =>
+            `<tr>
+              <td style="padding:8px 12px;border-bottom:1px solid #eee;font-weight:600">${a.name}</td>
+              <td style="padding:8px 12px;border-bottom:1px solid #eee">${a.endDate}</td>
+              <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#b45309;font-weight:600">${a.daysLeft === 0 ? "DZIŚ!" : a.daysLeft + " dni"}</td>
+              <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#dc2626;font-weight:700">${a.due.toFixed(2)} PLN</td>
+              <td style="padding:8px 12px;border-bottom:1px solid #eee">${a.phone}</td>
+            </tr>`
+        )
+        .join("");
+
+      const html = `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+          <h2 style="color:#b45309">⚠️ Alert płatności — MyWay CRM</h2>
+          <p>Poniżsi pacjenci kończą terapię w ciągu <strong>${DAYS_BEFORE} dni</strong> i mają <strong>niezapłacone kwoty</strong>:</p>
+          <table style="width:100%;border-collapse:collapse;font-size:14px;margin:16px 0">
+            <thead>
+              <tr style="background:#fef3c7">
+                <th style="padding:8px 12px;text-align:left">Pacjent</th>
+                <th style="padding:8px 12px;text-align:left">Koniec terapii</th>
+                <th style="padding:8px 12px;text-align:left">Pozostało</th>
+                <th style="padding:8px 12px;text-align:left">Do zapłaty</th>
+                <th style="padding:8px 12px;text-align:left">Telefon</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <p style="color:#666;font-size:12px">Wiadomość wygenerowana automatycznie przez MyWay CRM · ${todayStr}</p>
+        </div>
+      `;
+
+      const text = alerts
+        .map((a) => `${a.name} — koniec: ${a.endDate} (za ${a.daysLeft} dni) — do zapłaty: ${a.due.toFixed(2)} PLN — tel: ${a.phone}`)
+        .join("\n");
+
+      await sendEmailWithResend(
+        ALERT_EMAIL,
+        `⚠️ Alert płatności: ${alerts.length} pacjent(ów) — MyWay CRM`,
+        html,
+        `Alert płatności MyWay CRM\n\n${text}`
+      );
+
+      console.log(`Payment alert sent to ${ALERT_EMAIL}: ${alerts.length} patients.`);
+      return null;
+    } catch (error) {
+      console.error("Payment alert error:", error);
+      return null;
+    }
+  });
