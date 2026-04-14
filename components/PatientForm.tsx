@@ -125,6 +125,15 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
         treatmentEndDate: prefillFromQueue.plannedEndDate || '',
         notes: prefillFromQueue.notes || '',
       }));
+
+      // Transfer deposit as a payment entry with date and method
+      if (prefillFromQueue.depositAmount > 0) {
+        setPayments([{
+          amount: prefillFromQueue.depositAmount,
+          date: prefillFromQueue.depositDate || new Date().toISOString().split('T')[0],
+          method: 'przedplata',
+        }]);
+      }
     }
   }, [prefillFromQueue]);
 
