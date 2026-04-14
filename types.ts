@@ -25,6 +25,9 @@ export interface Patient {
   // Wpłaty (dynamiczna lista)
   payments?: Payment[];
 
+  // Usługi dodatkowe (recepty, psychiatra, kroplówki, inne)
+  additionalServices?: AdditionalService[];
+
   // New management fields
   isWeek5: boolean;
   hasWhatsapp: boolean;
@@ -48,6 +51,22 @@ export interface Payment {
   date: string;
   method: 'przelew' | 'gotowka' | 'karta' | 'przedplata';
 }
+
+export type AdditionalServiceType = 'recepta' | 'psychiatra' | 'kroplowka' | 'inne';
+
+export interface AdditionalService {
+  type: AdditionalServiceType;
+  date: string;
+  amount: number;
+  note?: string;
+}
+
+export const SERVICE_TYPE_LABELS: Record<AdditionalServiceType, string> = {
+  recepta: 'Recepta',
+  psychiatra: 'Psychiatra',
+  kroplowka: 'Kroplówka',
+  inne: 'Inne',
+};
 
 // Queue (Kolejka) - patients waiting for admission
 export interface QueuePatient {
@@ -82,9 +101,14 @@ export const isInterruptedTherapy = (patient: Patient): boolean => {
     patient.dischargeType !== 'completed';
 };
 
-// Derived property for amount due
+// Total additional services cost
+export const getAdditionalServicesTotal = (patient: Patient): number => {
+  return (patient.additionalServices || []).reduce((sum, s) => sum + (s.amount || 0), 0);
+};
+
+// Derived property for amount due (includes additional services)
 export const getAmountDue = (patient: Patient): number => {
-  return patient.totalAmount - patient.amountPaid;
+  return patient.totalAmount + getAdditionalServicesTotal(patient) - patient.amountPaid;
 };
 
 export const formatCurrency = (amount: number): string => {

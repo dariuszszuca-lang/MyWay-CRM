@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Patient, Payment, QueuePatient, formatCurrency } from '../types';
-import { PlusCircle, Calculator, Save, X, Trash2, Search, UserCheck } from 'lucide-react';
+import { Patient, Payment, QueuePatient, AdditionalService, SERVICE_TYPE_LABELS, formatCurrency } from '../types';
+import type { AdditionalServiceType } from '../types';
+import { PlusCircle, Calculator, Save, X, Trash2, Search, UserCheck, Stethoscope } from 'lucide-react';
 
 interface PatientFormProps {
   onSubmit: (patient: Patient) => void;
@@ -37,6 +38,7 @@ const defaultPatient: Omit<Patient, 'id'> = {
 const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCancel, prefillFromQueue, allPatients }) => {
   const [formData, setFormData] = useState<Omit<Patient, 'id'> | Patient>(defaultPatient);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [services, setServices] = useState<AdditionalService[]>([]);
   const [returningSearch, setReturningSearch] = useState('');
   const [showReturningResults, setShowReturningResults] = useState(false);
   const [returningPrefilled, setReturningPrefilled] = useState<string | null>(null);
@@ -91,6 +93,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
       notes: prevNotes,
     });
     setPayments([]);
+    setServices([]);
     setReturningSearch('');
     setShowReturningResults(false);
     setReturningPrefilled(`${patient.firstName} ${patient.lastName}`);
@@ -107,6 +110,8 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
       } else {
         setPayments([]);
       }
+      // Load additional services
+      setServices(initialData.additionalServices || []);
     }
   }, [initialData]);
 
@@ -158,6 +163,21 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
     setPayments(prev => prev.map((p, i) => i === index ? { ...p, [field]: field === 'amount' ? Number(value) : value } : p));
   };
 
+  // Additional services handlers
+  const addService = () => {
+    setServices(prev => [...prev, { type: 'recepta' as AdditionalServiceType, date: new Date().toISOString().split('T')[0], amount: 0, note: '' }]);
+  };
+
+  const removeService = (index: number) => {
+    setServices(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateService = (index: number, field: keyof AdditionalService, value: string | number) => {
+    setServices(prev => prev.map((s, i) => i === index ? { ...s, [field]: field === 'amount' ? Number(value) : value } : s));
+  };
+
+  const totalServices = services.reduce((sum, s) => sum + (s.amount || 0), 0);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -165,6 +185,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
     const patientToSave: Patient = {
       ...formData,
       payments,
+      additionalServices: services,
       amountPaid: payments.reduce((sum, p) => sum + (p.amount || 0), 0),
       id: initialData?.id || crypto.randomUUID()
     };
@@ -178,7 +199,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
   };
 
   const totalPaid = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
-  const amountDue = formData.totalAmount - totalPaid;
+  const amountDue = formData.totalAmount + totalServices - totalPaid;
   const isVip = formData.package === 'vip';
 
   // Styling enforcing white background and black text for inputs
@@ -422,6 +443,71 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
                 >
                   <PlusCircle size={16} /> Dodaj wpłatę
                 </button>
+              </div>
+
+              {/* Usługi dodatkowe — dynamiczna lista */}
+              <div className="mt-6 space-y-3">
+                <p className="text-sm font-bold text-purple-700 uppercase flex items-center gap-2">
+                  <Stethoscope size={16} /> Usługi dodatkowe
+                </p>
+
+                {services.map((service, index) => (
+                  <div key={index} className="bg-purple-50 p-4 rounded-lg border border-purple-200 relative">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs font-bold text-purple-700 uppercase">
+                        {SERVICE_TYPE_LABELS[service.type] || 'Usługa'} {index + 1}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => removeService(index)}
+                        className="text-red-400 hover:text-red-600 transition p-1"
+                        title="Usuń usługę"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div>
+                        <label className="text-xs text-gray-600 font-semibold mb-1 block">Rodzaj</label>
+                        <select value={service.type} onChange={(e) => updateService(index, 'type', e.target.value)} className={inputClass}>
+                          <option value="recepta">Recepta</option>
+                          <option value="psychiatra">Psychiatra</option>
+                          <option value="kroplowka">Kroplówka</option>
+                          <option value="inne">Inne</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600 font-semibold mb-1 block">Data</label>
+                        <input type="date" value={service.date || ''} onChange={(e) => updateService(index, 'date', e.target.value)} className={inputClass} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600 font-semibold mb-1 block">Kwota (PLN)</label>
+                        <input type="number" value={service.amount || ''} onChange={(e) => updateService(index, 'amount', e.target.value)} className={inputClass} placeholder="0.00" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600 font-semibold mb-1 block">Uwagi</label>
+                        <input type="text" value={service.note || ''} onChange={(e) => updateService(index, 'note', e.target.value)} className={inputClass} placeholder="np. nazwa leku" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={addService}
+                  className="w-full py-3 rounded-lg border-2 border-dashed border-purple-300 text-purple-600 font-semibold text-sm hover:bg-purple-50 hover:border-purple-400 transition flex items-center justify-center gap-2"
+                >
+                  <PlusCircle size={16} /> Dodaj usługę
+                </button>
+
+                {totalServices > 0 && (
+                  <div className="bg-purple-50 p-3 rounded-lg border border-purple-100">
+                    <div className="flex items-center gap-2 text-purple-900 font-bold text-sm">
+                      <Stethoscope size={14} />
+                      <span>Usługi dodatkowe łącznie: {formatCurrency(totalServices)}</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Podsumowanie */}
