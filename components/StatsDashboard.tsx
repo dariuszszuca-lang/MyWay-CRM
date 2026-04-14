@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { Patient, formatCurrency, getAmountDue, normalizeVoivodeship, isInterruptedTherapy, DISCHARGE_TYPE_LABELS } from '../types';
+import { Patient, formatCurrency, getAmountDue, getAdditionalServicesTotal, normalizeVoivodeship, isInterruptedTherapy, DISCHARGE_TYPE_LABELS, SERVICE_TYPE_LABELS } from '../types';
+import type { AdditionalServiceType } from '../types';
 import { generateStatsPDF, StatsData } from '../services/pdfGenerator';
-import { Download, Users, Wallet, AlertTriangle, TrendingUp, Calendar, RotateCcw, UserX } from 'lucide-react';
+import { Download, Users, Wallet, AlertTriangle, TrendingUp, Calendar, RotateCcw, UserX, Stethoscope } from 'lucide-react';
 
 interface StatsDashboardProps {
   patients: Patient[];
@@ -84,7 +85,16 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
       expelled: filtered.filter(p => p.dischargeType === 'expelled').length,
     };
 
-    return { active, discharged, totalRevenue, totalCollected, totalOutstanding, unpaidCount, collectionRate, totalRefunds, netRevenue, interruptedCount, interruptedByType };
+    // Additional services
+    const allServices = filtered.flatMap(p => p.additionalServices || []);
+    const totalServicesAmount = allServices.reduce((s, svc) => s + (svc.amount || 0), 0);
+    const servicesByType = (['recepta', 'psychiatra', 'kroplowka', 'inne'] as AdditionalServiceType[]).map(type => ({
+      type,
+      count: allServices.filter(s => s.type === type).length,
+      amount: allServices.filter(s => s.type === type).reduce((s, svc) => s + (svc.amount || 0), 0),
+    }));
+
+    return { active, discharged, totalRevenue, totalCollected, totalOutstanding, unpaidCount, collectionRate, totalRefunds, netRevenue, interruptedCount, interruptedByType, totalServicesAmount, servicesByType };
   }, [filtered]);
 
   // Package breakdown
@@ -316,7 +326,48 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
             {stats.interruptedCount === 0 && 'brak'}
           </div>
         </div>
+        {/* Additional Services KPI */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 bg-violet-100 rounded-lg flex items-center justify-center">
+              <Stethoscope className="w-4 h-4 text-violet-600" />
+            </div>
+            <span className="text-xs font-semibold text-gray-500 uppercase">Usługi dodatkowe</span>
+          </div>
+          <div className="text-2xl font-bold text-violet-600">{formatCurrency(stats.totalServicesAmount)}</div>
+          <div className="text-xs text-gray-400 mt-1">
+            {stats.servicesByType.filter(s => s.count > 0).map(s => `${SERVICE_TYPE_LABELS[s.type]}: ${s.count}`).join(', ') || 'brak'}
+          </div>
+        </div>
       </div>
+
+      {/* Additional Services Details */}
+      {stats.totalServicesAmount > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h3 className="text-sm font-bold text-gray-700 uppercase mb-4 flex items-center gap-2">
+            <Stethoscope className="w-4 h-4 text-violet-500" />
+            Usługi dodatkowe — szczegóły
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {stats.servicesByType.map(s => {
+              const colors: Record<string, { bg: string; text: string; bar: string }> = {
+                recepta: { bg: 'bg-blue-50', text: 'text-blue-700', bar: 'bg-blue-500' },
+                psychiatra: { bg: 'bg-violet-50', text: 'text-violet-700', bar: 'bg-violet-500' },
+                kroplowka: { bg: 'bg-emerald-50', text: 'text-emerald-700', bar: 'bg-emerald-500' },
+                inne: { bg: 'bg-gray-50', text: 'text-gray-700', bar: 'bg-gray-500' },
+              };
+              const c = colors[s.type] || colors.inne;
+              return (
+                <div key={s.type} className={`${c.bg} rounded-xl p-4`}>
+                  <p className={`text-xs font-bold uppercase ${c.text}`}>{SERVICE_TYPE_LABELS[s.type]}</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{s.count}</p>
+                  <p className="text-sm font-semibold text-gray-600 mt-0.5">{formatCurrency(s.amount)}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Packages + Payment Status */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
