@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { QueuePatient, formatCurrency } from '../types';
+import { QueuePatient, Patient, formatCurrency } from '../types';
 import { UserPlus, Pencil, XCircle, Phone, Mail, Calendar, Wallet, Clock, CheckCircle, AlertCircle, Search, UserX } from 'lucide-react';
 import QueueForm from './QueueForm';
 
@@ -9,6 +9,7 @@ interface QueueListProps {
   onDeleteQueue: (id: string) => void;
   onAdmitPatient: (patient: QueuePatient) => void;
   onConfirmPatient: (patient: QueuePatient) => void;
+  allPatients?: Patient[];
 }
 
 const statusConfig = {
@@ -18,7 +19,7 @@ const statusConfig = {
   noshow: { label: 'Nie przyjechał', color: 'bg-orange-100 text-orange-800 border-orange-200', icon: UserX },
 };
 
-const QueueList: React.FC<QueueListProps> = ({ queue, onUpdateQueue, onDeleteQueue, onAdmitPatient, onConfirmPatient }) => {
+const QueueList: React.FC<QueueListProps> = ({ queue, onUpdateQueue, onDeleteQueue, onAdmitPatient, onConfirmPatient, allPatients = [] }) => {
   const [editingPatient, setEditingPatient] = useState<QueuePatient | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'waiting' | 'confirmed' | 'cancelled' | 'noshow'>('all');
@@ -81,6 +82,7 @@ const QueueList: React.FC<QueueListProps> = ({ queue, onUpdateQueue, onDeleteQue
               initialData={editingPatient}
               onSubmit={handleSaveEdit}
               onCancel={() => setEditingPatient(null)}
+              allPatients={allPatients}
             />
           </div>
         </div>

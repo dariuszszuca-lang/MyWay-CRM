@@ -11,6 +11,8 @@ interface DischargeData {
   refundDate?: string;
   conditionalReturnDate?: string;
   dischargeNotes?: string;
+  authorizedBy?: 'Natalia' | 'Krystian';
+  authorizedNote?: string;
 }
 
 interface PatientListProps {
@@ -35,6 +37,10 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
   const [dischargeRefundDate, setDischargeRefundDate] = useState<string>('');
   const [dischargeConditionalReturnDate, setDischargeConditionalReturnDate] = useState<string>('');
   const [dischargeNotes, setDischargeNotes] = useState<string>('');
+  // Override dla wypisu z długiem (tylko przy dischargeType='completed')
+  const [overrideDebt, setOverrideDebt] = useState<boolean>(false);
+  const [authorizedBy, setAuthorizedBy] = useState<'Natalia' | 'Krystian' | ''>('');
+  const [authorizedNote, setAuthorizedNote] = useState<string>('');
 
   // New filters
   const [filterVoivodeship, setFilterVoivodeship] = useState<string>('all');
@@ -196,6 +202,9 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
     setDischargeRefundDate('');
     setDischargeConditionalReturnDate('');
     setDischargeNotes('');
+    setOverrideDebt(false);
+    setAuthorizedBy('');
+    setAuthorizedNote('');
   };
 
   const closeDischargeModal = () => {
@@ -204,6 +213,19 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
 
   const handleConfirmDischarge = () => {
     if (!dischargeModalPatient) return;
+
+    // Walidacja: blokada wypisu typu "completed" przy niezapłaconej całości
+    const amountDue = getAmountDue(dischargeModalPatient);
+    if (dischargeType === 'completed' && amountDue > 0) {
+      if (!overrideDebt) {
+        alert(`Nie można zakończyć terapii. Pacjent ma do zapłaty ${formatCurrency(amountDue)}.\n\nJeśli chcesz wypisać mimo zadłużenia, zaznacz opcję "Wypis mimo zadłużenia" i wybierz osobę autoryzującą.`);
+        return;
+      }
+      if (!authorizedBy) {
+        alert('Wypis mimo zadłużenia wymaga autoryzacji. Wybierz kto zatwierdza (Natalia lub Krystian).');
+        return;
+      }
+    }
 
     const data: DischargeData = {
       dischargeType,
@@ -218,6 +240,12 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
     }
     if (dischargeNotes.trim()) {
       data.dischargeNotes = dischargeNotes.trim();
+    }
+    if (dischargeType === 'completed' && amountDue > 0 && overrideDebt && authorizedBy) {
+      data.authorizedBy = authorizedBy as 'Natalia' | 'Krystian';
+      if (authorizedNote.trim()) {
+        data.authorizedNote = authorizedNote.trim();
+      }
     }
 
     onDischargePatient(dischargeModalPatient, data);
@@ -440,6 +468,77 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
               </div>
             </div>
 
+            {/* Status płatności — zawsze widoczny */}
+            {(() => {
+              const amountDue = getAmountDue(dischargeModalPatient);
+              const isDebt = amountDue > 0;
+              const isCompleted = dischargeType === 'completed';
+              return (
+                <div className={`p-3 rounded-lg mb-4 border-2 ${isDebt ? 'bg-red-50 border-red-300' : 'bg-green-50 border-green-300'}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="font-semibold text-sm text-gray-900 flex items-center gap-2">
+                      <Wallet className="w-4 h-4" />
+                      Status płatności
+                    </div>
+                    <div className={`text-xs font-bold px-2 py-0.5 rounded ${isDebt ? 'bg-red-600 text-white' : 'bg-green-600 text-white'}`}>
+                      {isDebt ? 'ZADŁUŻENIE' : 'UREGULOWANE'}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div><span className="text-gray-500">Kwota total:</span><br/><strong>{formatCurrency(dischargeModalPatient.totalAmount)}</strong></div>
+                    <div><span className="text-gray-500">Wpłacono:</span><br/><strong>{formatCurrency(dischargeModalPatient.amountPaid)}</strong></div>
+                    <div><span className="text-gray-500">Do zapłaty:</span><br/><strong className={isDebt ? 'text-red-600' : 'text-green-600'}>{formatCurrency(amountDue)}</strong></div>
+                  </div>
+                  {isDebt && isCompleted && (
+                    <div className="mt-3 pt-3 border-t border-red-300">
+                      <div className="text-xs text-red-700 font-semibold mb-2">
+                        ⚠️ Nie można zakończyć terapii z niezapłaconą kwotą.
+                      </div>
+                      <label className="flex items-start gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={overrideDebt}
+                          onChange={(e) => {
+                            setOverrideDebt(e.target.checked);
+                            if (!e.target.checked) { setAuthorizedBy(''); setAuthorizedNote(''); }
+                          }}
+                          className="mt-0.5"
+                        />
+                        <span className="text-xs text-gray-800">
+                          <strong>Wypis mimo zadłużenia</strong> — wymaga autoryzacji Natalii lub Krystiana
+                        </span>
+                      </label>
+                      {overrideDebt && (
+                        <div className="mt-3 ml-5 space-y-2">
+                          <div>
+                            <div className="text-xs font-bold text-gray-700 mb-1">Autoryzuje:</div>
+                            <div className="flex gap-2">
+                              {(['Natalia', 'Krystian'] as const).map(p => (
+                                <label key={p} className={`flex-1 px-3 py-2 rounded-lg border-2 cursor-pointer text-center text-sm font-semibold transition-colors ${authorizedBy === p ? 'border-purple-500 bg-purple-50 text-purple-800' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                                  <input type="radio" name="authorizedBy" value={p} checked={authorizedBy === p} onChange={() => setAuthorizedBy(p)} className="sr-only" />
+                                  {p}
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-xs font-bold text-gray-700 mb-1 block">Powód (opcjonalnie)</label>
+                            <textarea
+                              rows={2}
+                              value={authorizedNote}
+                              onChange={(e) => setAuthorizedNote(e.target.value)}
+                              placeholder="np. spłata ratalnie do 31.05"
+                              className="w-full p-2 text-sm border border-gray-300 rounded-lg bg-white text-black focus:ring-2 focus:ring-purple-500 outline-none"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             {/* Summary */}
             <div className="p-3 bg-gray-50 rounded-lg mb-4 text-sm text-gray-700">
               <div className="font-semibold mb-1">Podsumowanie:</div>
@@ -461,14 +560,23 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
             </div>
 
             <div className="flex gap-3">
-              <button
-                onClick={handleConfirmDischarge}
-                disabled={dischargeType === 'expelled' && !dischargeNotes.trim()}
-                className="flex-1 bg-purple-600 text-white py-2.5 rounded-lg font-bold hover:bg-purple-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <LogOut className="w-4 h-4" />
-                Wypisz pacjenta
-              </button>
+              {(() => {
+                const amountDue = getAmountDue(dischargeModalPatient);
+                const blockedByDebt = dischargeType === 'completed' && amountDue > 0 && (!overrideDebt || !authorizedBy);
+                const blockedByExpelled = dischargeType === 'expelled' && !dischargeNotes.trim();
+                const isBlocked = blockedByDebt || blockedByExpelled;
+                return (
+                  <button
+                    onClick={handleConfirmDischarge}
+                    disabled={isBlocked}
+                    className="flex-1 bg-purple-600 text-white py-2.5 rounded-lg font-bold hover:bg-purple-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={blockedByDebt ? `Do zapłaty: ${formatCurrency(amountDue)}` : ''}
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Wypisz pacjenta
+                  </button>
+                );
+              })()}
               <button
                 onClick={closeDischargeModal}
                 className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-lg font-bold hover:bg-gray-200 transition-colors"

@@ -118,12 +118,25 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
   // Pre-fill from queue patient data
   useEffect(() => {
     if (prefillFromQueue) {
+      // Jeśli kolejka ma linkedPatientId — weź pełne dane z karty pacjenta (wracający)
+      const linked = prefillFromQueue.linkedPatientId
+        ? (allPatients || []).find(p => p.id === prefillFromQueue.linkedPatientId)
+        : null;
+
       setFormData(prev => ({
         ...prev,
-        firstName: prefillFromQueue.firstName,
-        lastName: prefillFromQueue.lastName,
-        phone: prefillFromQueue.phone,
-        email: prefillFromQueue.email || '',
+        // Podstawowe dane: queue > linked > prev
+        firstName: prefillFromQueue.firstName || linked?.firstName || prev.firstName,
+        lastName: prefillFromQueue.lastName || linked?.lastName || prev.lastName,
+        phone: prefillFromQueue.phone || linked?.phone || prev.phone,
+        email: prefillFromQueue.email || linked?.email || '',
+        // Dane osobowe: z kolejki (wypełnione pełnio), fallback na linked jeśli istnieje
+        pesel: prefillFromQueue.pesel || linked?.pesel || '',
+        birthDate: prefillFromQueue.birthDate || linked?.birthDate || '',
+        idSeries: prefillFromQueue.idSeries || linked?.idSeries || '',
+        address: prefillFromQueue.address || linked?.address || '',
+        voivodeship: prefillFromQueue.voivodeship || linked?.voivodeship || '',
+        // Pakiet i terminy
         package: prefillFromQueue.package,
         amountPaid: prefillFromQueue.depositAmount,
         treatmentStartDate: prefillFromQueue.plannedStartDate || '',
@@ -139,8 +152,25 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
           method: 'przedplata',
         }]);
       }
+
+      // Detoks z kolejki → dodaj jako usługę dodatkową
+      if (prefillFromQueue.detoks) {
+        setServices(prev => {
+          const hasDetoks = prev.some(s => s.type === 'detoks');
+          if (hasDetoks) return prev;
+          return [
+            ...prev,
+            {
+              type: 'detoks' as const,
+              date: prefillFromQueue.plannedStartDate || new Date().toISOString().split('T')[0],
+              amount: 0,
+              note: 'Z kolejki — doprecyzuj kwotę',
+            },
+          ];
+        });
+      }
     }
-  }, [prefillFromQueue]);
+  }, [prefillFromQueue, allPatients]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;

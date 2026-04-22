@@ -282,6 +282,8 @@ const App: React.FC = () => {
     refundDate?: string;
     conditionalReturnDate?: string;
     dischargeNotes?: string;
+    authorizedBy?: 'Natalia' | 'Krystian';
+    authorizedNote?: string;
   }) => {
     try {
       // 1. Build update payload
@@ -301,6 +303,12 @@ const App: React.FC = () => {
       }
       if (dischargeData.dischargeNotes) {
         updatePayload.dischargeNotes = dischargeData.dischargeNotes;
+      }
+      if (dischargeData.authorizedBy) {
+        updatePayload.dischargeAuthorizedBy = dischargeData.authorizedBy;
+      }
+      if (dischargeData.authorizedNote) {
+        updatePayload.dischargeAuthorizedNote = dischargeData.authorizedNote;
       }
 
       // 2. Update Firestore
@@ -620,7 +628,7 @@ const App: React.FC = () => {
 
                 {/* Queue Add Form */}
                 <div className="mb-8">
-                  <QueueForm onSubmit={handleAddToQueue} />
+                  <QueueForm onSubmit={handleAddToQueue} allPatients={patients} />
                 </div>
 
                 {/* Queue List */}
@@ -630,6 +638,7 @@ const App: React.FC = () => {
                   onDeleteQueue={handleDeleteQueue}
                   onAdmitPatient={handleAdmitPatient}
                   onConfirmPatient={handleConfirmQueuePatient}
+                  allPatients={patients}
                 />
               </div>
             )}

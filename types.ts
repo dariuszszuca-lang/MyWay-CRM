@@ -44,6 +44,10 @@ export interface Patient {
   refundDate?: string;
   conditionalReturnDate?: string;
   dischargeNotes?: string;
+
+  // Authorization for discharge with outstanding debt (only for dischargeType='completed')
+  dischargeAuthorizedBy?: 'Natalia' | 'Krystian';
+  dischargeAuthorizedNote?: string;
 }
 
 export interface Payment {
@@ -52,7 +56,7 @@ export interface Payment {
   method: 'przelew' | 'gotowka' | 'karta' | 'przedplata';
 }
 
-export type AdditionalServiceType = 'recepta' | 'psychiatra' | 'kroplowka' | 'inne';
+export type AdditionalServiceType = 'recepta' | 'psychiatra' | 'kroplowka' | 'detoks' | 'inne';
 
 export interface AdditionalService {
   type: AdditionalServiceType;
@@ -65,22 +69,36 @@ export const SERVICE_TYPE_LABELS: Record<AdditionalServiceType, string> = {
   recepta: 'Recepta',
   psychiatra: 'Psychiatra',
   kroplowka: 'Kroplówka',
+  detoks: 'Detoks',
   inne: 'Inne',
 };
 
 // Queue (Kolejka) - patients waiting for admission
 export interface QueuePatient {
   id: string;
+  // Podstawowe dane
   firstName: string;
   lastName: string;
   phone: string;
   email: string;
+  // Pełne dane pacjenta (wypełniane w kolejce, żeby przyjęcie było 1 klikiem)
+  pesel?: string;
+  birthDate?: string;
+  idSeries?: string;        // seria/nr dowodu
+  address?: string;
+  voivodeship?: string;
+  // Pakiet i zaliczka
   package: '1' | '2' | '3' | '6tyg' | '8tyg' | '6tyg_roz' | '8tyg_roz' | 'interwencyjna' | 'vip';
   depositAmount: number;     // Wpłacona zaliczka
   depositDate: string;       // Data wpłaty zaliczki
   plannedStartDate: string;  // Planowany termin OD
   plannedEndDate: string;    // Planowany termin DO
   notes: string;
+  // Dodatkowe usługi
+  detoks?: boolean;          // Czy wymagany detoks (dodawany jako additional service przy przyjęciu)
+  // Powiązanie z kartą pacjenta w CRM (dla wracających)
+  linkedPatientId?: string;
+  // Stan
   createdAt: string;
   status: 'waiting' | 'confirmed' | 'cancelled' | 'noshow';
 }
