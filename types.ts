@@ -94,8 +94,8 @@ export interface QueuePatient {
   plannedStartDate: string;  // Planowany termin OD
   plannedEndDate: string;    // Planowany termin DO
   notes: string;
-  // Dodatkowe usługi
-  detoks?: boolean;          // Czy wymagany detoks (dodawany jako additional service przy przyjęciu)
+  // Dodatkowe usługi — detoks (pakiet 1-dniowy lub 3-dniowy)
+  detoksPackage?: '1day' | '3days';  // '1day' = 1000 zł, '3days' = 2700 zł. Undefined = brak detoksu.
   // Powiązanie z kartą pacjenta w CRM (dla wracających)
   linkedPatientId?: string;
   // Stan

@@ -259,6 +259,7 @@ const App: React.FC = () => {
           phone: patient.phone,
           startDate: patient.plannedStartDate,
           endDate: patient.plannedEndDate,
+          detoksPackage: patient.detoksPackage,
         });
         if (result) {
           alert(`✅ ${patient.firstName} potwierdzony! Mail powitalny wysłany + dodany do list GetResponse.`);

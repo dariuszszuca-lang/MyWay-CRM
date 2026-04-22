@@ -132,7 +132,7 @@ async function sendNewsletterToContact(contactId, campaignId, subject, htmlConte
 // HTML EMAIL TEMPLATES
 // =======================================================================
 
-function getWelcomeEmailHtml(firstName, packageType, startDate, endDate) {
+function getWelcomeEmailHtml(firstName, packageType, startDate, endDate, detoksPackage) {
   const packageNames = {
     "1": "Pakiet 1 — Podstawowy (28 dni)",
     "2": "Pakiet 2 — Rozszerzony",
@@ -145,6 +145,10 @@ function getWelcomeEmailHtml(firstName, packageType, startDate, endDate) {
     "vip": "Grupa VIP",
   };
   const packageName = packageNames[packageType] || `Pakiet ${packageType}`;
+  const detoksInfo = {
+    "1day": { label: "Detoks 1 dzień", amount: "1 000 zł" },
+    "3days": { label: "Detoks 3 dni", amount: "2 700 zł" },
+  }[detoksPackage];
 
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
@@ -171,6 +175,16 @@ function getWelcomeEmailHtml(firstName, packageType, startDate, endDate) {
         ${endDate ? `<tr><td style="padding:6px 0;font-weight:bold;">Planowany koniec:</td><td>${endDate}</td></tr>` : ""}
       </table>
     </div>
+
+    ${detoksInfo ? `
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:20px;margin:24px 0;">
+      <h3 style="margin:0 0 8px;color:#1d4ed8;font-size:16px;">💊 Usługa dodatkowa: ${detoksInfo.label}</h3>
+      <p style="font-size:14px;color:#333;line-height:1.6;margin:0;">
+        Przed rozpoczęciem właściwej terapii przeprowadzimy u Ciebie <strong>${detoksInfo.label.toLowerCase()}</strong> (dodatkowo: ${detoksInfo.amount}).
+        Detoks odbywa się w ośrodku pod opieką medyczną. Szczegóły omówimy przy przyjęciu.
+      </p>
+    </div>
+    ` : ""}
 
     <div style="text-align:center;margin:24px 0;">
       <p style="font-size:15px;color:#555;margin:0 0 12px;">🎬 Przed przyjazdem poznaj nas lepiej:</p>
@@ -251,7 +265,7 @@ function getWelcomeEmailHtml(firstName, packageType, startDate, endDate) {
 </body></html>`;
 }
 
-function getWelcomeEmailPlain(firstName, packageType, startDate) {
+function getWelcomeEmailPlain(firstName, packageType, startDate, detoksPackage) {
   const packageNames = {
     "1": "Pakiet 1 — Podstawowy (28 dni)",
     "2": "Pakiet 2 — Rozszerzony",
@@ -264,7 +278,12 @@ function getWelcomeEmailPlain(firstName, packageType, startDate) {
     "vip": "Grupa VIP",
   };
   const packageName = packageNames[packageType] || `Pakiet ${packageType}`;
-  return `Cześć ${firstName}!\n\nPotwierdzamy Twój termin w Ośrodku My Way.\n\nWariant terapii: ${packageName}\n${startDate ? `Data przyjazdu: ${startDate}\n` : ""}\nCo spakować:\n- Środki higieny osobistej\n- Ręcznik\n- Ubrania na min. 7 dni\n- Strój sportowy\n- Obuwie + klapki\n- Kurtka\n- Laptop i telefon\n- Dowód osobisty\n- Ulubione lub aktualnie czytane książki\n- Leki i suplementy (zapas + dawkowanie, przekaż terapeucie)\n- Papierosy (dostęp do sklepu ograniczony regulaminem)\n${(packageType === "3" || packageType === "6tyg_roz" || packageType === "8tyg_roz") ? `\nBonus w Twoim pakiecie:\nTwój pakiet zawiera dodatkowe konsultacje indywidualne (online lub na miejscu).\n` : ""}\nMasz pytania? Dzwoń: 731 395 295\n\nDo zobaczenia!\nEkipa My Way\nosrodek-myway.pl`;
+  const detoksLine = detoksPackage === "1day"
+    ? "\nUsługa dodatkowa: Detoks 1 dzień (1 000 zł) — przed rozpoczęciem terapii.\n"
+    : detoksPackage === "3days"
+      ? "\nUsługa dodatkowa: Detoks 3 dni (2 700 zł) — przed rozpoczęciem terapii.\n"
+      : "";
+  return `Cześć ${firstName}!\n\nPotwierdzamy Twój termin w Ośrodku My Way.\n\nWariant terapii: ${packageName}\n${startDate ? `Data przyjazdu: ${startDate}\n` : ""}${detoksLine}\nCo spakować:\n- Środki higieny osobistej\n- Ręcznik\n- Ubrania na min. 7 dni\n- Strój sportowy\n- Obuwie + klapki\n- Kurtka\n- Laptop i telefon\n- Dowód osobisty\n- Ulubione lub aktualnie czytane książki\n- Leki i suplementy (zapas + dawkowanie, przekaż terapeucie)\n- Papierosy (dostęp do sklepu ograniczony regulaminem)\n${(packageType === "3" || packageType === "6tyg_roz" || packageType === "8tyg_roz") ? `\nBonus w Twoim pakiecie:\nTwój pakiet zawiera dodatkowe konsultacje indywidualne (online lub na miejscu).\n` : ""}\nMasz pytania? Dzwoń: 731 395 295\n\nDo zobaczenia!\nEkipa My Way\nosrodek-myway.pl`;
 }
 
 function getFarewellEmailHtml(firstName, packageType) {
@@ -442,7 +461,7 @@ exports.onPatientConfirmed = functions
     if (req.method !== "POST") { res.status(405).json({ success: false }); return; }
 
     try {
-      const { email, firstName, lastName, package: pkg, phone, startDate, endDate } = req.body;
+      const { email, firstName, lastName, package: pkg, phone, startDate, endDate, detoksPackage } = req.body;
 
       if (!email || !firstName) {
         res.status(400).json({ success: false, error: "Missing email or firstName" });
@@ -495,8 +514,8 @@ exports.onPatientConfirmed = functions
 
       // 5. Wyślij maila powitalnego
       const subject = `Cześć ${firstName}! Potwierdzamy Twój termin w My Way 🏡`;
-      const html = getWelcomeEmailHtml(firstName, pkg, startDate, endDate);
-      const plain = getWelcomeEmailPlain(firstName, pkg, startDate);
+      const html = getWelcomeEmailHtml(firstName, pkg, startDate, endDate, detoksPackage);
+      const plain = getWelcomeEmailPlain(firstName, pkg, startDate, detoksPackage);
 
       const nlRes = await sendNewsletterToContact(contactId, ALL_CONTACTS_CAMPAIGN_ID, subject, html, plain);
       let emailSent = false;

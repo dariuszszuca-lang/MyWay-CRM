@@ -25,7 +25,7 @@ const defaultQueue: Omit<QueuePatient, 'id'> = {
   plannedStartDate: '',
   plannedEndDate: '',
   notes: '',
-  detoks: false,
+  detoksPackage: undefined,
   linkedPatientId: undefined,
   createdAt: new Date().toISOString().split('T')[0],
   status: 'waiting'
@@ -294,10 +294,10 @@ const QueueForm: React.FC<QueueFormProps> = ({ onSubmit, initialData, onCancel, 
           </div>
         </div>
 
-        {/* Planowany termin + detoks + uwagi */}
+        {/* Planowany termin + uwagi */}
         <div>
-          <h3 className={sectionHeader}>Termin i usługi</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+          <h3 className={sectionHeader}>Planowany termin</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             <div>
               <label className={labelClass}>Od</label>
               <input type="date" name="plannedStartDate" value={formData.plannedStartDate} onChange={handleChange} className={inputClass} />
@@ -307,18 +307,56 @@ const QueueForm: React.FC<QueueFormProps> = ({ onSubmit, initialData, onCancel, 
               <input type="date" name="plannedEndDate" value={formData.plannedEndDate} onChange={handleChange} className={inputClass} />
             </div>
             <div>
-              <label className={labelClass}>Detoks</label>
-              <label className="flex items-center gap-2 h-[42px] px-3 bg-white border border-gray-300 rounded-lg cursor-pointer">
-                <input type="checkbox" name="detoks" checked={!!formData.detoks} onChange={handleChange} className="w-4 h-4 text-amber-600 rounded" />
-                <span className="text-sm text-gray-700">Wymagany detoks</span>
-              </label>
-            </div>
-            <div className="md:col-span-2 lg:col-span-1">
               <label className={labelClass}>Uwagi</label>
               <textarea name="notes" value={formData.notes} onChange={handleChange} placeholder="Dodatkowe informacje..." rows={2}
                 className="p-2.5 border border-gray-300 rounded-lg w-full bg-white text-black placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all shadow-sm resize-none" />
             </div>
           </div>
+        </div>
+
+        {/* Usługa dodatkowa — Detoks */}
+        <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
+          <h3 className="text-sm font-bold text-blue-800 uppercase tracking-wider mb-3 flex items-center gap-2">
+            💊 Usługa dodatkowa: Detoks
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {[
+              { value: undefined, label: 'Bez detoksu', amount: 0, desc: 'Pacjent nie potrzebuje detoksu' },
+              { value: '1day' as const, label: 'Detoks 1 dzień', amount: 1000, desc: '1 doba detoksu' },
+              { value: '3days' as const, label: 'Detoks 3 dni', amount: 2700, desc: '3 doby detoksu' },
+            ].map((opt, idx) => (
+              <label
+                key={idx}
+                className={`flex items-start gap-2 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
+                  formData.detoksPackage === opt.value
+                    ? 'border-blue-500 bg-white shadow-sm'
+                    : 'border-gray-200 bg-white hover:border-gray-300'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="detoksPackage"
+                  value={opt.value || ''}
+                  checked={formData.detoksPackage === opt.value}
+                  onChange={() => setFormData(prev => ({ ...prev, detoksPackage: opt.value }))}
+                  className="mt-1"
+                />
+                <div className="flex-1">
+                  <div className="font-semibold text-sm text-gray-900">{opt.label}</div>
+                  <div className="text-xs text-gray-500">{opt.desc}</div>
+                  {opt.amount > 0 && (
+                    <div className="text-xs font-bold text-blue-700 mt-1">+ {opt.amount} zł</div>
+                  )}
+                </div>
+              </label>
+            ))}
+          </div>
+          {formData.detoksPackage && (
+            <div className="mt-3 text-xs text-blue-700 bg-blue-100 rounded px-3 py-2">
+              Detoks zostanie automatycznie dodany do karty pacjenta przy przyjęciu (z datą i kwotą).
+              Pacjent dostanie info w mailu potwierdzającym.
+            </div>
+          )}
         </div>
 
         <div className="flex gap-4">

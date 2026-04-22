@@ -57,6 +57,7 @@ export const confirmPatientEmail = async (data: {
   phone?: string;
   startDate?: string;
   endDate?: string;
+  detoksPackage?: '1day' | '3days';
 }): Promise<boolean> => {
   try {
     const response = await fetch(`${CF_BASE}/onPatientConfirmed`, {

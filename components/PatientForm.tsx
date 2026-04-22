@@ -153,8 +153,12 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
         }]);
       }
 
-      // Detoks z kolejki → dodaj jako usługę dodatkową
-      if (prefillFromQueue.detoks) {
+      // Detoks z kolejki → dodaj jako usługę dodatkową (z kwotą i typem)
+      if (prefillFromQueue.detoksPackage) {
+        const detoksConfig = {
+          '1day': { amount: 1000, note: 'Detoks 1 dzień' },
+          '3days': { amount: 2700, note: 'Detoks 3 dni' },
+        }[prefillFromQueue.detoksPackage];
         setServices(prev => {
           const hasDetoks = prev.some(s => s.type === 'detoks');
           if (hasDetoks) return prev;
@@ -163,8 +167,8 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
             {
               type: 'detoks' as const,
               date: prefillFromQueue.plannedStartDate || new Date().toISOString().split('T')[0],
-              amount: 0,
-              note: 'Z kolejki — doprecyzuj kwotę',
+              amount: detoksConfig.amount,
+              note: detoksConfig.note,
             },
           ];
         });
