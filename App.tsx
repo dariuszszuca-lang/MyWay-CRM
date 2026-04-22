@@ -211,10 +211,19 @@ const App: React.FC = () => {
   };
 
   // --- QUEUE CRUD ---
+  // Firestore nie akceptuje undefined w polach — usuń je przed zapisem
+  const stripUndefined = <T extends Record<string, any>>(obj: T): Partial<T> => {
+    const out: Partial<T> = {};
+    for (const key in obj) {
+      if (obj[key] !== undefined) out[key] = obj[key];
+    }
+    return out;
+  };
+
   const handleAddToQueue = async (queuePatient: QueuePatient) => {
     try {
       const { id, ...dataToSave } = queuePatient;
-      await addDoc(collection(db, "queue"), dataToSave);
+      await addDoc(collection(db, "queue"), stripUndefined(dataToSave));
       alert("Dodano do kolejki.");
     } catch (err) {
       alert("Błąd podczas dodawania do kolejki.");
@@ -226,7 +235,7 @@ const App: React.FC = () => {
     try {
       const ref = doc(db, "queue", updated.id);
       const { id, ...dataToUpdate } = updated;
-      await updateDoc(ref, dataToUpdate);
+      await updateDoc(ref, stripUndefined(dataToUpdate));
     } catch (err) {
       alert("Błąd podczas aktualizacji kolejki.");
       console.error(err);
