@@ -35,18 +35,30 @@ const QueueForm: React.FC<QueueFormProps> = ({ onSubmit, initialData, onCancel, 
   const [formData, setFormData] = useState<Omit<QueuePatient, 'id'> | QueuePatient>(defaultQueue);
   const [returningSearch, setReturningSearch] = useState('');
   const [showResults, setShowResults] = useState(false);
-  const [linkedInfo, setLinkedInfo] = useState<string | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
+
+  // Wybrany pacjent wracający — wyliczany live z linkedPatientId
+  const linkedPatient = formData.linkedPatientId
+    ? allPatients.find(p => p.id === formData.linkedPatientId) || null
+    : null;
+
+  // Format daty YYYY-MM-DD → MM.YYYY
+  const formatShort = (d?: string) => {
+    if (!d) return '';
+    const parts = d.split('-');
+    return parts.length >= 2 ? `${parts[1]}.${parts[0]}` : d;
+  };
+  const previousStayLabel = linkedPatient
+    ? (linkedPatient.treatmentStartDate
+        ? `poprzedni pobyt ${formatShort(linkedPatient.treatmentStartDate)}`
+        : 'poprzedni pobyt')
+    : '';
 
   useEffect(() => {
     if (initialData) {
       setFormData(initialData);
-      if (initialData.linkedPatientId) {
-        const p = allPatients.find(x => x.id === initialData.linkedPatientId);
-        if (p) setLinkedInfo(`${p.firstName} ${p.lastName}`);
-      }
     }
-  }, [initialData, allPatients]);
+  }, [initialData]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -83,14 +95,13 @@ const QueueForm: React.FC<QueueFormProps> = ({ onSubmit, initialData, onCancel, 
       voivodeship: p.voivodeship || '',
       linkedPatientId: p.id,
     }));
-    setLinkedInfo(`${p.firstName} ${p.lastName}`);
     setReturningSearch('');
     setShowResults(false);
   };
 
-  const clearLink = () => {
+  const changeSelection = () => {
+    // "Zmień" — czyści link, wraca do wyszukiwarki. Dane w formularzu zostają (user może tylko zmienić link).
     setFormData(prev => ({ ...prev, linkedPatientId: undefined }));
-    setLinkedInfo(null);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -112,7 +123,6 @@ const QueueForm: React.FC<QueueFormProps> = ({ onSubmit, initialData, onCancel, 
     onSubmit(patientToSave);
     if (!initialData) {
       setFormData(defaultQueue);
-      setLinkedInfo(null);
     }
   };
 
@@ -144,14 +154,17 @@ const QueueForm: React.FC<QueueFormProps> = ({ onSubmit, initialData, onCancel, 
               <span className="text-sm font-bold text-amber-800">Pacjent wracający?</span>
               <span className="text-xs text-amber-700">Wpisz imię, nazwisko, telefon lub PESEL — zaciągniemy dane z karty.</span>
             </div>
-            {linkedInfo ? (
+            {linkedPatient ? (
               <div className="flex items-center justify-between bg-green-100 border border-green-300 rounded-lg px-3 py-2">
                 <div className="flex items-center gap-2 text-sm text-green-800">
                   <UserCheck className="w-4 h-4" />
-                  <span className="font-semibold">Połączono z kartą: {linkedInfo}</span>
+                  <span className="font-semibold">
+                    Wybrano: {linkedPatient.firstName} {linkedPatient.lastName}
+                    {previousStayLabel && <span className="text-green-700 font-normal"> ({previousStayLabel})</span>}
+                  </span>
                 </div>
-                <button type="button" onClick={clearLink} className="text-green-700 hover:text-red-600 text-xs font-bold uppercase">
-                  Odłącz
+                <button type="button" onClick={changeSelection} className="text-green-700 hover:text-amber-700 text-xs font-bold uppercase">
+                  Zmień
                 </button>
               </div>
             ) : (
