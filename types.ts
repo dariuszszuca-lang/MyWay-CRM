@@ -133,6 +133,70 @@ export const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' }).format(amount);
 };
 
+// ============================================================================
+// ROOMS — feature/rooms (plan pokoi). Niezależne od istniejących typów.
+// ============================================================================
+
+export interface Room {
+  id: string;              // Firestore doc id (np. "1", "2", "D", "10")
+  number: string;          // wyświetlana nazwa: "1", "D", "10"
+  capacity: number;        // max pacjentów (sztywny limit)
+  notes?: string;          // np. "Pokój dla kobiet", "Izolatka — dojrzewalnia"
+  isDisabled: boolean;     // remont/awaria/sprzątanie
+  disabledReason?: string;
+  disabledFrom?: string;   // YYYY-MM-DD
+  disabledTo?: string;     // YYYY-MM-DD
+  order?: number;          // do sortowania w UI
+}
+
+export interface RoomAssignment {
+  id: string;             // Firestore doc id
+  patientId: string;      // ref do patients/{id}
+  roomId: string;         // ref do rooms/{id}
+  fromDate: string;       // YYYY-MM-DD — początek przypisania w tym pokoju
+  toDate: string | null;  // null = aktualnie tu, w innym przypadku data zmiany pokoju lub wypisu
+  notes?: string;
+  createdAt: string;      // ISO timestamp
+}
+
+// Helper: który pokój ma pacjent teraz?
+export const getCurrentRoomAssignment = (
+  patientId: string,
+  assignments: RoomAssignment[]
+): RoomAssignment | null => {
+  return assignments.find(a => a.patientId === patientId && a.toDate === null) || null;
+};
+
+// Helper: ile osób jest teraz w pokoju?
+export const getRoomOccupancy = (
+  roomId: string,
+  assignments: RoomAssignment[]
+): number => {
+  return assignments.filter(a => a.roomId === roomId && a.toDate === null).length;
+};
+
+// Helper: wszyscy aktualni mieszkańcy pokoju
+export const getRoomCurrentPatients = (
+  roomId: string,
+  assignments: RoomAssignment[]
+): RoomAssignment[] => {
+  return assignments.filter(a => a.roomId === roomId && a.toDate === null);
+};
+
+// Seed 10 pokoi — wartości od Marcina (5.05.2026)
+export const ROOMS_SEED: Omit<Room, 'id'>[] = [
+  { number: '1',  capacity: 4, notes: 'Pokój zazwyczaj dedykowany dla kobiet', isDisabled: false, order: 1 },
+  { number: '2',  capacity: 2, isDisabled: false, order: 2 },
+  { number: '3',  capacity: 3, isDisabled: false, order: 3 },
+  { number: '4',  capacity: 3, isDisabled: false, order: 4 },
+  { number: '5',  capacity: 2, isDisabled: false, order: 5 },
+  { number: '6',  capacity: 3, isDisabled: false, order: 6 },
+  { number: '7',  capacity: 2, isDisabled: false, order: 7 },
+  { number: '8',  capacity: 4, isDisabled: false, order: 8 },
+  { number: 'D',  capacity: 2, notes: 'Dojrzewalnia — izolatka dla osób przyjeżdżających pod wpływem', isDisabled: false, order: 9 },
+  { number: '10', capacity: 3, isDisabled: false, order: 10 },
+];
+
 // Normalize voivodeship names (typos, case, dashes, foreign)
 export const normalizeVoivodeship = (v: string): string | null => {
   if (!v) return null;
