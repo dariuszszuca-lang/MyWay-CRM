@@ -18,7 +18,7 @@ const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
 };
 
 // Helper to load fonts
-const loadFonts = async (doc: jsPDF) => {
+export const loadFonts = async (doc: jsPDF) => {
   try {
     const regularResponse = await fetch(FONT_URL_REGULAR);
     const regularBlob = await regularResponse.arrayBuffer();

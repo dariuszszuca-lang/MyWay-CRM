@@ -9,9 +9,10 @@ import StatsDashboard from './components/StatsDashboard';
 import RoomsTab from './components/RoomsTab';
 import { Activity, Users, Download, Cloud, RefreshCw, LogOut, Clock, BarChart3, AlertTriangle, BedDouble } from 'lucide-react';
 import { db, auth } from './firebaseConfig';
-import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, getDocs, where } from 'firebase/firestore';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { sendWelcomeEmail, confirmPatientEmail, dischargePatientEmail } from './services/getResponseService';
+import { closeAssignment } from './services/roomsService';
 
 // --- KONFIGURACJA DOSTĘPU (BIAŁA LISTA) ---
 const ALLOWED_EMAILS = [
@@ -325,6 +326,21 @@ const App: React.FC = () => {
       // 2. Update Firestore
       const patientRef = doc(db, "patients", patient.id);
       await updateDoc(patientRef, updatePayload);
+
+      // 2b. Auto-zwolnienie pokoju: zamknij aktywny RoomAssignment z toDate = dischargeDate.
+      // Try/catch — błąd tu nie blokuje wypisu (sam wypis już zapisany).
+      try {
+        const activeAssignmentsSnap = await getDocs(query(
+          collection(db, "roomAssignments"),
+          where("patientId", "==", patient.id),
+          where("toDate", "==", null)
+        ));
+        for (const docSnap of activeAssignmentsSnap.docs) {
+          await closeAssignment(docSnap.id, dischargeData.dischargeDate);
+        }
+      } catch (roomErr) {
+        console.error("Nie udało się auto-zwolnić pokoju przy wypisie:", roomErr);
+      }
 
       // 3. Send farewell email ONLY for completed therapy
       if (dischargeData.dischargeType === 'completed' && patient.email) {

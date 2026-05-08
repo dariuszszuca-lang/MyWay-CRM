@@ -50,13 +50,16 @@ const RoomTimelineReport: React.FC<Props> = ({ patients, rooms, assignments }) =
     }
     for (const a of assignments) {
       if (!map[a.roomId]) continue;
+      const p = patients.find(pp => pp.id === a.patientId);
+      // Pacjent po wypisie/zakończeniu terapii nie powinien wisieć w pokoju.
+      // dischargeDate ma pierwszeństwo (rzeczywisty wypis), inaczej treatmentEndDate (planowany).
+      const effectiveEnd = p?.dischargeDate || p?.treatmentEndDate || null;
       for (const day of days) {
         const inRange = a.fromDate <= day && (a.toDate === null || day < a.toDate);
-        if (inRange) {
-          const p = patients.find(pp => pp.id === a.patientId);
-          const label = p ? `${p.firstName.charAt(0)}.${p.lastName}` : '?';
-          map[a.roomId][day].push(label);
-        }
+        if (!inRange) continue;
+        if (effectiveEnd && day > effectiveEnd) continue;
+        const label = p ? `${p.firstName.charAt(0)}.${p.lastName}` : '?';
+        map[a.roomId][day].push(label);
       }
     }
     return map;

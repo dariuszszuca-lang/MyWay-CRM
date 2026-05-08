@@ -3,6 +3,7 @@ import { Patient, Room, RoomAssignment } from '../types';
 import { Download, CheckCircle, AlertCircle } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { loadFonts } from '../services/pdfGenerator';
 
 interface Props {
   patients: Patient[];
@@ -57,10 +58,14 @@ const RoomAvailabilityReport: React.FC<Props> = ({ patients, rooms, assignments 
     });
   }, [sortedRooms, assignments, patients, t]);
 
-  const exportPDF = () => {
+  const exportPDF = async () => {
     const docPdf = new jsPDF({ unit: 'pt', format: 'a4' });
+    // Roboto z polskimi znakami — bez tego ą/ę/ś/ć rozjeżdżają się w PDF.
+    await loadFonts(docPdf);
+    docPdf.setFont('Roboto', 'bold');
     docPdf.setFontSize(16);
     docPdf.text('Wolne pokoje — raport MyWay', 40, 40);
+    docPdf.setFont('Roboto', 'normal');
     docPdf.setFontSize(9);
     docPdf.text(`Wygenerowano: ${new Date().toLocaleString('pl-PL')}`, 40, 56);
 
@@ -90,14 +95,16 @@ const RoomAvailabilityReport: React.FC<Props> = ({ patients, rooms, assignments 
       head, body,
       startY: 70,
       theme: 'grid',
-      styles: { fontSize: 9, cellPadding: 5 },
-      headStyles: { fillColor: [13, 79, 79], textColor: 255 },
+      styles: { font: 'Roboto', fontSize: 9, cellPadding: 5, overflow: 'linebreak', valign: 'top' },
+      headStyles: { font: 'Roboto', fontStyle: 'bold', fillColor: [13, 79, 79], textColor: 255 },
       columnStyles: {
         0: { cellWidth: 90, fontStyle: 'bold' },
         1: { cellWidth: 60, halign: 'center' },
         2: { cellWidth: 50, halign: 'center' },
         3: { cellWidth: 110 },
+        4: { cellWidth: 'auto' },
       },
+      margin: { left: 40, right: 40 },
     });
 
     docPdf.save(`wolne-pokoje-${t}.pdf`);

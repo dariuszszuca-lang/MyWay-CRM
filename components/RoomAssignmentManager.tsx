@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Patient, Room, RoomAssignment, getCurrentRoomAssignment, getRoomOccupancy } from '../types';
 import { createAssignment, closeAssignment, deleteAssignment, movePatientToRoom } from '../services/roomsService';
 import { UserPlus, Move, X, History, AlertTriangle } from 'lucide-react';
@@ -15,6 +15,7 @@ const RoomAssignmentManager: React.FC<Props> = ({ patients, rooms, assignments }
   const [selectedPatientId, setSelectedPatientId] = useState<string>('');
   const [moveRoomId, setMoveRoomId] = useState<string>('');
   const [moveDate, setMoveDate] = useState<string>(today());
+  const [moveToDate, setMoveToDate] = useState<string>('');
   const [moveNotes, setMoveNotes] = useState<string>('');
   const [historyOpenFor, setHistoryOpenFor] = useState<string | null>(null);
 
@@ -32,6 +33,12 @@ const RoomAssignmentManager: React.FC<Props> = ({ patients, rooms, assignments }
   const currentAssignment = selectedPatient ? getCurrentRoomAssignment(selectedPatient.id, assignments) : null;
   const currentRoom = currentAssignment ? rooms.find(r => r.id === currentAssignment.roomId) : null;
 
+  // Po wyborze pacjenta auto-podpowiedz "do kiedy" z karty pacjenta (treatmentEndDate).
+  // User może nadpisać ręcznie — wartość zachowuje się aż do zmiany pacjenta.
+  useEffect(() => {
+    setMoveToDate(selectedPatient?.treatmentEndDate || '');
+  }, [selectedPatientId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const patientHistory = (patientId: string) =>
     assignments.filter(a => a.patientId === patientId).sort((a, b) => b.fromDate.localeCompare(a.fromDate));
 
@@ -45,6 +52,7 @@ const RoomAssignmentManager: React.FC<Props> = ({ patients, rooms, assignments }
       if (!confirm(`Pokój ${room.number} jest pełny (${occ}/${room.capacity}). Mimo to przypisać?`)) return;
     }
     try {
+      const toDateValue = moveToDate || null;
       if (currentAssignment) {
         if (currentAssignment.roomId === moveRoomId) {
           return alert(`${selectedPatient.firstName} jest już w pokoju ${room.number}.`);
@@ -54,6 +62,7 @@ const RoomAssignmentManager: React.FC<Props> = ({ patients, rooms, assignments }
           oldAssignmentId: currentAssignment.id,
           newRoomId: moveRoomId,
           fromDate: moveDate,
+          toDate: toDateValue,
           notes: moveNotes || undefined,
         });
         alert(`${selectedPatient.firstName} przeniesiony do pokoju ${room.number}.`);
@@ -62,7 +71,7 @@ const RoomAssignmentManager: React.FC<Props> = ({ patients, rooms, assignments }
           patientId: selectedPatient.id,
           roomId: moveRoomId,
           fromDate: moveDate,
-          toDate: null,
+          toDate: toDateValue,
           notes: moveNotes || undefined,
           createdAt: new Date().toISOString(),
         });
@@ -141,11 +150,20 @@ const RoomAssignmentManager: React.FC<Props> = ({ patients, rooms, assignments }
                   return <option key={r.id} value={r.id}>{label}</option>;
                 })}
               </select>
-              <input
-                type="date" value={moveDate}
-                onChange={e => setMoveDate(e.target.value)}
-                className="border rounded px-3 py-2 text-sm"
-              />
+              <div className="flex flex-col gap-1">
+                <input
+                  type="date" value={moveDate}
+                  onChange={e => setMoveDate(e.target.value)}
+                  className="border rounded px-3 py-2 text-sm"
+                  title="Od kiedy w pokoju"
+                />
+                <input
+                  type="date" value={moveToDate}
+                  onChange={e => setMoveToDate(e.target.value)}
+                  className="border rounded px-3 py-2 text-sm"
+                  title="Do kiedy w pokoju (opcjonalne, default = data zakończenia terapii)"
+                />
+              </div>
               <input
                 type="text" placeholder="Notatka (opcjonalnie)"
                 value={moveNotes}

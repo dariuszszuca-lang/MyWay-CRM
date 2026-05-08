@@ -67,9 +67,10 @@ export async function movePatientToRoom(args: {
   oldAssignmentId: string | null;
   newRoomId: string;
   fromDate: string;       // od kiedy w nowym pokoju
+  toDate?: string | null; // opcjonalnie: do kiedy (default null = "do odwołania")
   notes?: string;
 }): Promise<string> {
-  const { patientId, oldAssignmentId, newRoomId, fromDate, notes } = args;
+  const { patientId, oldAssignmentId, newRoomId, fromDate, toDate, notes } = args;
   if (oldAssignmentId) {
     // toDate stare = fromDate nowego (zazwyczaj)
     await closeAssignment(oldAssignmentId, fromDate);
@@ -78,7 +79,7 @@ export async function movePatientToRoom(args: {
     patientId,
     roomId: newRoomId,
     fromDate,
-    toDate: null,
+    toDate: toDate ?? null,
     notes,
     createdAt: new Date().toISOString(),
   });
