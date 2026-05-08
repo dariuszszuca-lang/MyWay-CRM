@@ -7,7 +7,8 @@ import QueueList from './components/QueueList';
 import Login from './components/Login';
 import StatsDashboard from './components/StatsDashboard';
 import RoomsTab from './components/RoomsTab';
-import { Activity, Users, Download, Cloud, RefreshCw, LogOut, Clock, BarChart3, AlertTriangle, BedDouble } from 'lucide-react';
+import ReportsTab from './components/ReportsTab';
+import { Activity, Users, Download, Cloud, RefreshCw, LogOut, Clock, BarChart3, AlertTriangle, BedDouble, FileText } from 'lucide-react';
 import { db, auth } from './firebaseConfig';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, getDocs, where } from 'firebase/firestore';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
@@ -30,7 +31,7 @@ const App: React.FC = () => {
 
   const [patients, setPatients] = useState<Patient[]>([]);
   const [queue, setQueue] = useState<QueuePatient[]>([]);
-  const [activeTab, setActiveTab] = useState<'form' | 'list' | 'queue' | 'stats' | 'rooms'>('form');
+  const [activeTab, setActiveTab] = useState<'form' | 'list' | 'queue' | 'stats' | 'rooms' | 'reports'>('form');
   const [dataLoading, setDataLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -420,7 +421,7 @@ const App: React.FC = () => {
   };
 
   // Cancel prefill when switching away from form
-  const switchTab = (tab: 'form' | 'list' | 'queue' | 'stats' | 'rooms') => {
+  const switchTab = (tab: 'form' | 'list' | 'queue' | 'stats' | 'rooms' | 'reports') => {
     if (tab !== 'form') {
       setPrefillQueue(null);
       setAdmittingQueueId(null);
@@ -534,6 +535,18 @@ const App: React.FC = () => {
               >
                 <BedDouble className="w-4 h-4" />
                 Pokoje
+              </button>
+
+              <button
+                onClick={() => switchTab('reports')}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
+                  activeTab === 'reports'
+                    ? 'bg-teal-50 text-teal-700 border border-teal-200'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <FileText className="w-4 h-4" />
+                Raporty
               </button>
 
               <button
@@ -691,6 +704,12 @@ const App: React.FC = () => {
             {activeTab === 'rooms' && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <RoomsTab patients={patients} queue={queue} />
+              </div>
+            )}
+
+            {activeTab === 'reports' && (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <ReportsTab patients={patients} queue={queue} />
               </div>
             )}
           </>
