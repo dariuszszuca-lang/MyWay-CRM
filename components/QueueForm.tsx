@@ -24,6 +24,7 @@ const defaultQueue: Omit<QueuePatient, 'id'> = {
   depositDate: new Date().toISOString().split('T')[0],
   plannedStartDate: '',
   plannedEndDate: '',
+  plannedArrivalTime: '',
   notes: '',
   detoksPackage: undefined,
   linkedPatientId: undefined,
@@ -311,6 +312,17 @@ const QueueForm: React.FC<QueueFormProps> = ({ onSubmit, initialData, onCancel, 
               <textarea name="notes" value={formData.notes} onChange={handleChange} placeholder="Dodatkowe informacje..." rows={2}
                 className="p-2.5 border border-gray-300 rounded-lg w-full bg-white text-black placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all shadow-sm resize-none" />
             </div>
+          </div>
+          <div className="mt-4">
+            <label className={labelClass}>Planowana godzina przyjazdu (opcjonalnie)</label>
+            <input
+              type="time"
+              name="plannedArrivalTime"
+              value={formData.plannedArrivalTime || ''}
+              onChange={handleChange}
+              className={inputClass}
+              style={{ maxWidth: '200px' }}
+            />
           </div>
         </div>
 

@@ -93,6 +93,7 @@ export interface QueuePatient {
   depositDate: string;       // Data wpłaty zaliczki
   plannedStartDate: string;  // Planowany termin OD
   plannedEndDate: string;    // Planowany termin DO
+  plannedArrivalTime?: string; // Planowana godzina przyjazdu w formacie HH:MM (opcjonalna)
   notes: string;
   // Dodatkowe usługi — detoks (pakiet 1-dniowy lub 3-dniowy)
   detoksPackage?: '1day' | '3days';  // '1day' = 1000 zł, '3days' = 2700 zł. Undefined = brak detoksu.
@@ -151,12 +152,13 @@ export interface Room {
 
 export interface RoomAssignment {
   id: string;             // Firestore doc id
-  patientId: string;      // ref do patients/{id}
+  patientId: string;      // ref do patients/{id} — pusty/placeholder jeśli przypisanie pochodzi z kolejki
   roomId: string;         // ref do rooms/{id}
   fromDate: string;       // YYYY-MM-DD — początek przypisania w tym pokoju
   toDate: string | null;  // null = aktualnie tu, w innym przypadku data zmiany pokoju lub wypisu
   notes?: string;
   createdAt: string;      // ISO timestamp
+  queuePatientId?: string; // ref do queue/{id} — jeśli pokój zarezerwowany przed przyjęciem z kolejki
 }
 
 // Helper: który pokój ma pacjent teraz?

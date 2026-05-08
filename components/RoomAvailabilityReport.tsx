@@ -12,10 +12,19 @@ interface Props {
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
+const addDays = (iso: string, n: number): string => {
+  const d = new Date(iso); d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+};
 const formatDay = (iso: string) => {
   if (!iso) return '?';
   const d = new Date(iso);
   return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+};
+const plMiejsca = (n: number): string => {
+  if (n === 1) return 'wolne miejsce';
+  if (n >= 2 && n <= 4) return 'wolne miejsca';
+  return 'wolnych miejsc';
 };
 
 interface RoomFreeInfo {
@@ -56,6 +65,88 @@ const RoomAvailabilityReport: React.FC<Props> = ({ patients, rooms, assignments 
       // Jeśli wszyscy mają daty, pierwsze miejsce zwolni się przy najwcześniejszej dacie
       return { room, freeFrom: dates[0], occupants, isFullForever: false };
     });
+  }, [sortedRooms, assignments, patients, t]);
+
+  // Plan zwolnień — granularny widok następnych 28 dni z liczbą wolnych miejsc per pokój.
+  // Pokazuje TYLKO daty kiedy pojawiają się NOWE wolne miejsca (zwolnienia).
+  const upcomingChanges = useMemo(() => {
+    const horizon = 28;
+    const out: { date: string; rooms: { roomId: string; roomNumber: string; capacity: number; freeSpaces: number; departing: string[] }[] }[] = [];
+
+    let prevSnapshot: Record<string, number> = {};
+    for (let i = 0; i <= horizon; i++) {
+      const date = addDays(t, i);
+      const snapshot: Record<string, number> = {};
+      const departures: Record<string, string[]> = {};
+
+      for (const room of sortedRooms) {
+        if (room.isDisabled) { snapshot[room.id] = 0; continue; }
+        const occupiedAssignments = assignments.filter(a => {
+          if (a.roomId !== room.id) return false;
+          if (a.fromDate > date) return false;
+          if (a.toDate !== null && a.toDate <= date) return false;
+          const p = patients.find(pp => pp.id === a.patientId);
+          if (p) {
+            const end = p.dischargeDate || p.treatmentEndDate;
+            if (end && end < date) return false;
+          }
+          return true;
+        });
+        snapshot[room.id] = Math.max(0, room.capacity - occupiedAssignments.length);
+      }
+
+      // Kto wychodzi w tym dniu (do kontekstu w UI)
+      if (i > 0) {
+        for (const room of sortedRooms) {
+          const yesterday = addDays(date, -1);
+          const yesterdayOccupants = assignments.filter(a => {
+            if (a.roomId !== room.id) return false;
+            if (a.fromDate > yesterday) return false;
+            if (a.toDate !== null && a.toDate <= yesterday) return false;
+            const p = patients.find(pp => pp.id === a.patientId);
+            if (p) {
+              const end = p.dischargeDate || p.treatmentEndDate;
+              if (end && end < yesterday) return false;
+            }
+            return true;
+          });
+          const todayOccupantIds = new Set(assignments.filter(a => {
+            if (a.roomId !== room.id) return false;
+            if (a.fromDate > date) return false;
+            if (a.toDate !== null && a.toDate <= date) return false;
+            const p = patients.find(pp => pp.id === a.patientId);
+            if (p) {
+              const end = p.dischargeDate || p.treatmentEndDate;
+              if (end && end < date) return false;
+            }
+            return true;
+          }).map(a => a.patientId));
+          const departed = yesterdayOccupants.filter(a => !todayOccupantIds.has(a.patientId));
+          if (departed.length > 0) {
+            departures[room.id] = departed.map(a => {
+              const p = patients.find(pp => pp.id === a.patientId);
+              return p ? `${p.firstName} ${p.lastName}` : 'nieznany';
+            });
+          }
+        }
+      }
+
+      if (i === 0) {
+        // Dziś — pokaż pokoje z wolnymi miejscami
+        const ws = sortedRooms.filter(r => !r.isDisabled && snapshot[r.id] > 0).map(r => ({
+          roomId: r.id, roomNumber: r.number, capacity: r.capacity, freeSpaces: snapshot[r.id], departing: [],
+        }));
+        if (ws.length > 0) out.push({ date, rooms: ws });
+      } else {
+        // Dni kolejne — pokaż tylko pokoje gdzie pojawiło się NOWE wolne miejsce
+        const changed = sortedRooms.filter(r => !r.isDisabled && snapshot[r.id] > (prevSnapshot[r.id] || 0)).map(r => ({
+          roomId: r.id, roomNumber: r.number, capacity: r.capacity, freeSpaces: snapshot[r.id], departing: departures[r.id] || [],
+        }));
+        if (changed.length > 0) out.push({ date, rooms: changed });
+      }
+      prevSnapshot = snapshot;
+    }
+    return out;
   }, [sortedRooms, assignments, patients, t]);
 
   const exportPDF = async () => {
@@ -184,6 +275,42 @@ const RoomAvailabilityReport: React.FC<Props> = ({ patients, rooms, assignments 
             );
           })}
           {info.length === 0 && <p className="text-gray-500 text-center py-8">Brak pokoi w bazie.</p>}
+        </div>
+      </div>
+
+      {/* Plan zwolnień — granularny widok kolejnych 4 tygodni z liczbą wolnych miejsc */}
+      <div className="bg-white rounded-lg shadow p-4">
+        <div className="mb-3">
+          <h2 className="text-xl font-bold text-gray-900">Plan zwolnień</h2>
+          <p className="text-xs text-gray-500 mt-1">
+            Następne 4 tygodnie. Pokazuje kiedy pojawią się nowe wolne miejsca w pokojach (w oparciu o daty zakończenia terapii i pole „do kiedy" przy przypisaniu pokoju).
+          </p>
+        </div>
+
+        {upcomingChanges.length === 0 && (
+          <p className="text-gray-500 text-sm py-4">Brak zmian w obłożeniu w nadchodzących 4 tygodniach.</p>
+        )}
+
+        <div className="space-y-3">
+          {upcomingChanges.map((day, idx) => (
+            <div key={day.date} className={`border-l-4 pl-3 py-1 ${idx === 0 && day.date === t ? 'border-green-500 bg-green-50' : 'border-amber-400 bg-amber-50'}`}>
+              <div className="font-bold text-sm text-gray-800">
+                {idx === 0 && day.date === t
+                  ? 'Wolne TERAZ'
+                  : `Wolne od ${formatDay(day.date)}`}
+              </div>
+              <ul className="text-sm text-gray-700 mt-1 space-y-0.5">
+                {day.rooms.map(r => (
+                  <li key={r.roomId}>
+                    Pokój <strong>{r.roomNumber}</strong>: <strong className="text-teal-700">{r.freeSpaces} {plMiejsca(r.freeSpaces)}</strong> (z {r.capacity})
+                    {r.departing.length > 0 && (
+                      <span className="text-xs text-gray-500 ml-2">— wychodzą: {r.departing.join(', ')}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
       </div>
     </div>

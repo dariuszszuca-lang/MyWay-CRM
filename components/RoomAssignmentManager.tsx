@@ -1,18 +1,25 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Patient, Room, RoomAssignment, getCurrentRoomAssignment, getRoomOccupancy } from '../types';
+import { Patient, QueuePatient, Room, RoomAssignment, getCurrentRoomAssignment, getRoomOccupancy } from '../types';
 import { createAssignment, closeAssignment, deleteAssignment, movePatientToRoom } from '../services/roomsService';
-import { UserPlus, Move, X, History, AlertTriangle } from 'lucide-react';
+import { UserPlus, Move, X, History, AlertTriangle, Clock } from 'lucide-react';
 
 interface Props {
   patients: Patient[];
   rooms: Room[];
   assignments: RoomAssignment[];
+  queue?: QueuePatient[]; // potwierdzeni z kolejki — można im pre-przypisać pokój przed przyjazdem
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
+const formatDay = (iso: string) => {
+  if (!iso) return '?';
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
 
-const RoomAssignmentManager: React.FC<Props> = ({ patients, rooms, assignments }) => {
-  const [selectedPatientId, setSelectedPatientId] = useState<string>('');
+const RoomAssignmentManager: React.FC<Props> = ({ patients, rooms, assignments, queue = [] }) => {
+  // selectedKey: "patient:<id>" albo "queue:<id>" — wspólny state pozwala wybrać tylko jedno
+  const [selectedKey, setSelectedKey] = useState<string>('');
   const [moveRoomId, setMoveRoomId] = useState<string>('');
   const [moveDate, setMoveDate] = useState<string>(today());
   const [moveToDate, setMoveToDate] = useState<string>('');
@@ -24,58 +31,125 @@ const RoomAssignmentManager: React.FC<Props> = ({ patients, rooms, assignments }
     [patients]
   );
 
+  const confirmedQueue = useMemo(() =>
+    queue.filter(q => q.status === 'confirmed').sort((a, b) => (a.plannedStartDate || '').localeCompare(b.plannedStartDate || '')),
+    [queue]
+  );
+
   const sortedRooms = useMemo(() =>
     [...rooms].sort((a, b) => (a.order || 99) - (b.order || 99)),
     [rooms]
   );
 
-  const selectedPatient = activePatients.find(p => p.id === selectedPatientId);
+  // Parser selectedKey
+  const isQueueSelection = selectedKey.startsWith('queue:');
+  const isPatientSelection = selectedKey.startsWith('patient:');
+  const realSelectedId = selectedKey.replace(/^(patient|queue):/, '');
+  const selectedPatient = isPatientSelection ? activePatients.find(p => p.id === realSelectedId) : undefined;
+  const selectedQueuePatient = isQueueSelection ? confirmedQueue.find(q => q.id === realSelectedId) : undefined;
+
   const currentAssignment = selectedPatient ? getCurrentRoomAssignment(selectedPatient.id, assignments) : null;
   const currentRoom = currentAssignment ? rooms.find(r => r.id === currentAssignment.roomId) : null;
+  // Czy ten queue patient ma już zarezerwowany pokój? (po queuePatientId)
+  const queueAssignment = selectedQueuePatient
+    ? assignments.find(a => a.queuePatientId === selectedQueuePatient.id && a.toDate === null)
+    : null;
+  const queueAssignedRoom = queueAssignment ? rooms.find(r => r.id === queueAssignment.roomId) : null;
 
-  // Po wyborze pacjenta auto-podpowiedz "do kiedy" z karty pacjenta (treatmentEndDate).
-  // User może nadpisać ręcznie — wartość zachowuje się aż do zmiany pacjenta.
+  // Po wyborze pacjenta lub queue — auto-podpowiedz daty.
+  // User może nadpisać ręcznie. Wartość zachowuje się aż do zmiany wyboru.
   useEffect(() => {
-    setMoveToDate(selectedPatient?.treatmentEndDate || '');
-  }, [selectedPatientId]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (selectedQueuePatient) {
+      setMoveDate(selectedQueuePatient.plannedStartDate || today());
+      setMoveToDate(selectedQueuePatient.plannedEndDate || '');
+    } else if (selectedPatient) {
+      setMoveDate(today());
+      setMoveToDate(selectedPatient.treatmentEndDate || '');
+    } else {
+      setMoveDate(today());
+      setMoveToDate('');
+    }
+  }, [selectedKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Ile osób będzie w pokoju w danym dniu (uwzględnia treatmentEndDate i toDate assignmentów)?
+  const occupancyAtDate = (roomId: string, dateISO: string): number => {
+    return assignments.filter(a => {
+      if (a.roomId !== roomId) return false;
+      if (a.fromDate > dateISO) return false;
+      if (a.toDate !== null && a.toDate <= dateISO) return false;
+      const p = patients.find(pp => pp.id === a.patientId);
+      if (p) {
+        const end = p.dischargeDate || p.treatmentEndDate;
+        if (end && end < dateISO) return false;
+      }
+      return true;
+    }).length;
+  };
 
   const patientHistory = (patientId: string) =>
     assignments.filter(a => a.patientId === patientId).sort((a, b) => b.fromDate.localeCompare(a.fromDate));
 
   const handleAssign = async () => {
-    if (!selectedPatient || !moveRoomId) return alert('Wybierz pacjenta i pokój.');
+    if (!selectedPatient && !selectedQueuePatient) return alert('Wybierz pacjenta i pokój.');
+    if (!moveRoomId) return alert('Wybierz pacjenta i pokój.');
     const room = rooms.find(r => r.id === moveRoomId);
     if (!room) return;
     if (room.isDisabled) return alert(`Pokój ${room.number} jest wyłączony (${room.disabledReason || 'brak powodu'}).`);
-    const occ = getRoomOccupancy(room.id, assignments);
-    if (occ >= room.capacity) {
-      if (!confirm(`Pokój ${room.number} jest pełny (${occ}/${room.capacity}). Mimo to przypisać?`)) return;
+
+    // Walidacja kolizji w dniu przyjazdu (uwzględnia datę zakończenia terapii)
+    const occAtArrival = occupancyAtDate(room.id, moveDate);
+    if (occAtArrival >= room.capacity) {
+      if (!confirm(`W pokoju ${room.number} w dniu ${moveDate} jest już ${occAtArrival}/${room.capacity} osób. Mimo to przypisać?`)) return;
     }
+
     try {
       const toDateValue = moveToDate || null;
-      if (currentAssignment) {
-        if (currentAssignment.roomId === moveRoomId) {
-          return alert(`${selectedPatient.firstName} jest już w pokoju ${room.number}.`);
+      const personLabel = selectedPatient
+        ? selectedPatient.firstName
+        : `${selectedQueuePatient!.firstName} (z kolejki)`;
+
+      // Tryb: queue patient — tworzymy assignment z queuePatientId, patientId pusty
+      if (selectedQueuePatient) {
+        // Zamknij stary queue-assignment jeśli był (zmiana pokoju przed przyjazdem)
+        if (queueAssignment) {
+          if (queueAssignment.roomId === moveRoomId) {
+            return alert(`${selectedQueuePatient.firstName} ma już zarezerwowany pokój ${room.number}.`);
+          }
+          await closeAssignment(queueAssignment.id, moveDate);
         }
-        await movePatientToRoom({
-          patientId: selectedPatient.id,
-          oldAssignmentId: currentAssignment.id,
-          newRoomId: moveRoomId,
-          fromDate: moveDate,
-          toDate: toDateValue,
-          notes: moveNotes || undefined,
-        });
-        alert(`${selectedPatient.firstName} przeniesiony do pokoju ${room.number}.`);
-      } else {
         await createAssignment({
-          patientId: selectedPatient.id,
+          patientId: '', // pusty — uzupełni się gdy queue patient zostanie przyjęty do bazy
+          queuePatientId: selectedQueuePatient.id,
           roomId: moveRoomId,
           fromDate: moveDate,
           toDate: toDateValue,
           notes: moveNotes || undefined,
           createdAt: new Date().toISOString(),
         });
-        alert(`${selectedPatient.firstName} przypisany do pokoju ${room.number}.`);
+        alert(`${personLabel} — pokój ${room.number} zarezerwowany na ${moveDate}${toDateValue ? ` – ${toDateValue}` : ''}.`);
+      } else if (currentAssignment) {
+        if (currentAssignment.roomId === moveRoomId) {
+          return alert(`${selectedPatient!.firstName} jest już w pokoju ${room.number}.`);
+        }
+        await movePatientToRoom({
+          patientId: selectedPatient!.id,
+          oldAssignmentId: currentAssignment.id,
+          newRoomId: moveRoomId,
+          fromDate: moveDate,
+          toDate: toDateValue,
+          notes: moveNotes || undefined,
+        });
+        alert(`${selectedPatient!.firstName} przeniesiony do pokoju ${room.number}.`);
+      } else {
+        await createAssignment({
+          patientId: selectedPatient!.id,
+          roomId: moveRoomId,
+          fromDate: moveDate,
+          toDate: toDateValue,
+          notes: moveNotes || undefined,
+          createdAt: new Date().toISOString(),
+        });
+        alert(`${selectedPatient!.firstName} przypisany do pokoju ${room.number}.`);
       }
       setMoveRoomId('');
       setMoveNotes('');
@@ -104,36 +178,77 @@ const RoomAssignmentManager: React.FC<Props> = ({ patients, rooms, assignments }
         <h2 className="text-xl font-bold text-gray-900">Przypisanie pokoju</h2>
 
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Pacjent (aktywni: {activePatients.length})</label>
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            Pacjent (aktywni: {activePatients.length}{confirmedQueue.length > 0 ? `, kolejka: ${confirmedQueue.length}` : ''})
+          </label>
           <select
-            value={selectedPatientId}
-            onChange={e => setSelectedPatientId(e.target.value)}
+            value={selectedKey}
+            onChange={e => setSelectedKey(e.target.value)}
             className="w-full border rounded px-3 py-2 text-sm"
           >
             <option value="">— Wybierz pacjenta —</option>
-            {activePatients.map(p => (
-              <option key={p.id} value={p.id}>
-                {p.lastName} {p.firstName}
-              </option>
-            ))}
+            {activePatients.length > 0 && (
+              <optgroup label="Aktywni pacjenci">
+                {activePatients.map(p => (
+                  <option key={`p-${p.id}`} value={`patient:${p.id}`}>
+                    {p.lastName} {p.firstName}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {confirmedQueue.length > 0 && (
+              <optgroup label="Z kolejki — potwierdzeni (rezerwacja przed przyjazdem)">
+                {confirmedQueue.map(q => (
+                  <option key={`q-${q.id}`} value={`queue:${q.id}`}>
+                    [KOLEJKA] {q.lastName} {q.firstName} {q.plannedStartDate ? `(przyjazd: ${formatDay(q.plannedStartDate)})` : ''}
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </select>
         </div>
 
-        {selectedPatient && (
+        {(selectedPatient || selectedQueuePatient) && (
           <div className="bg-gray-50 border rounded-lg p-3 space-y-2">
             <div className="flex flex-wrap items-center gap-3 text-sm">
-              <strong>{selectedPatient.firstName} {selectedPatient.lastName}</strong>
-              <span className="text-gray-500">·</span>
-              <span>Terapia: {selectedPatient.treatmentStartDate || '?'} → {selectedPatient.treatmentEndDate || '?'}</span>
-              <span className="text-gray-500">·</span>
-              {currentRoom ? (
-                <span className="bg-teal-100 text-teal-800 px-2 py-0.5 rounded text-xs font-medium">
-                  Aktualnie: pokój {currentRoom.number}
-                </span>
-              ) : (
-                <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-xs font-medium">
-                  Brak przypisania
-                </span>
+              {selectedPatient && (
+                <>
+                  <strong>{selectedPatient.firstName} {selectedPatient.lastName}</strong>
+                  <span className="text-gray-500">·</span>
+                  <span>Terapia: {selectedPatient.treatmentStartDate || '?'} → {selectedPatient.treatmentEndDate || '?'}</span>
+                  <span className="text-gray-500">·</span>
+                  {currentRoom ? (
+                    <span className="bg-teal-100 text-teal-800 px-2 py-0.5 rounded text-xs font-medium">
+                      Aktualnie: pokój {currentRoom.number}
+                    </span>
+                  ) : (
+                    <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-xs font-medium">
+                      Brak przypisania
+                    </span>
+                  )}
+                </>
+              )}
+              {selectedQueuePatient && (
+                <>
+                  <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-bold flex items-center gap-1">
+                    <Clock className="w-3 h-3" /> KOLEJKA
+                  </span>
+                  <strong>{selectedQueuePatient.firstName} {selectedQueuePatient.lastName}</strong>
+                  <span className="text-gray-500">·</span>
+                  <span>Przyjazd: {selectedQueuePatient.plannedStartDate ? formatDay(selectedQueuePatient.plannedStartDate) : '?'}{selectedQueuePatient.plannedArrivalTime ? ` o ${selectedQueuePatient.plannedArrivalTime}` : ''}</span>
+                  <span className="text-gray-500">·</span>
+                  <span>Wyjazd: {selectedQueuePatient.plannedEndDate ? formatDay(selectedQueuePatient.plannedEndDate) : '?'}</span>
+                  <span className="text-gray-500">·</span>
+                  {queueAssignedRoom ? (
+                    <span className="bg-teal-100 text-teal-800 px-2 py-0.5 rounded text-xs font-medium">
+                      Zarezerwowany: pokój {queueAssignedRoom.number}
+                    </span>
+                  ) : (
+                    <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-xs font-medium">
+                      Brak rezerwacji
+                    </span>
+                  )}
+                </>
               )}
             </div>
 
@@ -175,7 +290,9 @@ const RoomAssignmentManager: React.FC<Props> = ({ patients, rooms, assignments }
                   onClick={handleAssign}
                   className="flex-1 bg-teal-600 hover:bg-teal-700 text-white px-3 py-2 rounded text-sm font-medium flex items-center justify-center gap-1"
                 >
-                  {currentAssignment ? <><Move className="w-4 h-4" /> Przenieś</> : <><UserPlus className="w-4 h-4" /> Przypisz</>}
+                  {currentAssignment || queueAssignment
+                    ? <><Move className="w-4 h-4" /> {selectedQueuePatient ? 'Zmień rezerwację' : 'Przenieś'}</>
+                    : <><UserPlus className="w-4 h-4" /> {selectedQueuePatient ? 'Zarezerwuj' : 'Przypisz'}</>}
                 </button>
                 {currentAssignment && (
                   <button
@@ -189,15 +306,17 @@ const RoomAssignmentManager: React.FC<Props> = ({ patients, rooms, assignments }
               </div>
             </div>
 
-            <button
-              onClick={() => setHistoryOpenFor(historyOpenFor === selectedPatient.id ? null : selectedPatient.id)}
-              className="text-xs text-blue-600 hover:underline flex items-center gap-1 mt-2"
-            >
-              <History className="w-3 h-3" />
-              {historyOpenFor === selectedPatient.id ? 'Schowaj historię' : 'Pokaż historię pokoi'}
-            </button>
+            {selectedPatient && (
+              <button
+                onClick={() => setHistoryOpenFor(historyOpenFor === selectedPatient.id ? null : selectedPatient.id)}
+                className="text-xs text-blue-600 hover:underline flex items-center gap-1 mt-2"
+              >
+                <History className="w-3 h-3" />
+                {historyOpenFor === selectedPatient.id ? 'Schowaj historię' : 'Pokaż historię pokoi'}
+              </button>
+            )}
 
-            {historyOpenFor === selectedPatient.id && (
+            {selectedPatient && historyOpenFor === selectedPatient.id && (
               <div className="border-t pt-2 mt-2">
                 <h4 className="text-xs font-bold text-gray-600 mb-2">Historia pobytu w pokojach</h4>
                 <table className="w-full text-xs">

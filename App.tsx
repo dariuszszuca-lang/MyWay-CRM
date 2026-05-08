@@ -690,7 +690,7 @@ const App: React.FC = () => {
 
             {activeTab === 'rooms' && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <RoomsTab patients={patients} />
+                <RoomsTab patients={patients} queue={queue} />
               </div>
             )}
           </>
