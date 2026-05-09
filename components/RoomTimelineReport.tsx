@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Patient, Room, RoomAssignment } from '../types';
+import { Patient, QueuePatient, Room, RoomAssignment } from '../types';
 import { Download } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -8,6 +8,7 @@ interface Props {
   patients: Patient[];
   rooms: Room[];
   assignments: RoomAssignment[];
+  queue?: QueuePatient[];
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -32,7 +33,7 @@ const formatDayShort = (iso: string) => {
   return `${wd} ${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`;
 };
 
-const RoomTimelineReport: React.FC<Props> = ({ patients, rooms, assignments }) => {
+const RoomTimelineReport: React.FC<Props> = ({ patients, rooms, assignments, queue = [] }) => {
   const [from, setFrom] = useState(today());
   const [to, setTo] = useState(addDays(today(), 13));
 
@@ -50,16 +51,22 @@ const RoomTimelineReport: React.FC<Props> = ({ patients, rooms, assignments }) =
     }
     for (const a of assignments) {
       if (!map[a.roomId]) continue;
-      const p = patients.find(pp => pp.id === a.patientId);
-      // Pacjent po wypisie/zakończeniu terapii nie powinien wisieć w pokoju.
+      // Assignment może być dla aktywnego pacjenta (patientId) lub rezerwacji z kolejki (queuePatientId).
+      const p = a.patientId ? patients.find(pp => pp.id === a.patientId) : undefined;
+      const q = a.queuePatientId ? queue.find(qq => qq.id === a.queuePatientId) : undefined;
+      // Po wypisie/zakończeniu terapii pacjent nie powinien wisieć w pokoju.
       // dischargeDate ma pierwszeństwo (rzeczywisty wypis), inaczej treatmentEndDate (planowany).
-      const effectiveEnd = p?.dischargeDate || p?.treatmentEndDate || null;
+      // Dla rezerwacji z kolejki — plannedEndDate.
+      const effectiveEnd = p?.dischargeDate || p?.treatmentEndDate || q?.plannedEndDate || null;
+      const person = p || q;
+      const label = person ? `${person.firstName.charAt(0)}.${person.lastName}` : '?';
+      const isQueueRes = !p && !!q;
       for (const day of days) {
         const inRange = a.fromDate <= day && (a.toDate === null || day < a.toDate);
         if (!inRange) continue;
         if (effectiveEnd && day > effectiveEnd) continue;
-        const label = p ? `${p.firstName.charAt(0)}.${p.lastName}` : '?';
-        map[a.roomId][day].push(label);
+        // Rezerwacja z kolejki — oznaczamy gwiazdką żeby było widać że to plan, nie pobyt
+        map[a.roomId][day].push(isQueueRes ? `*${label}` : label);
       }
     }
     return map;
@@ -175,10 +182,12 @@ const RoomTimelineReport: React.FC<Props> = ({ patients, rooms, assignments }) =
           </table>
         </div>
 
-        <div className="flex gap-3 mt-3 text-xs text-gray-600">
+        <div className="flex gap-3 mt-3 text-xs text-gray-600 flex-wrap">
           <span className="flex items-center gap-1"><span className="w-3 h-3 bg-green-50 border" /> zajęty</span>
           <span className="flex items-center gap-1"><span className="w-3 h-3 bg-red-50 border" /> pełny</span>
           <span className="flex items-center gap-1"><span className="w-3 h-3 bg-gray-100 border" /> wyłączony</span>
+          <span className="text-gray-500">·</span>
+          <span><strong>*nazwisko</strong> = rezerwacja z kolejki (jeszcze nie przyjechał)</span>
         </div>
       </div>
     </div>

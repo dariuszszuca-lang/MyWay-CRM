@@ -51,8 +51,13 @@ const RoomAssignmentManager: React.FC<Props> = ({ patients, rooms, assignments, 
   const currentAssignment = selectedPatient ? getCurrentRoomAssignment(selectedPatient.id, assignments) : null;
   const currentRoom = currentAssignment ? rooms.find(r => r.id === currentAssignment.roomId) : null;
   // Czy ten queue patient ma już zarezerwowany pokój? (po queuePatientId)
+  // UWAGA: rezerwacje z kolejki MAJĄ toDate (plannedEndDate), więc szukamy też po
+  // przyszłej dacie. Aktywna rezerwacja = toDate=null LUB toDate >= dzisiaj.
   const queueAssignment = selectedQueuePatient
-    ? assignments.find(a => a.queuePatientId === selectedQueuePatient.id && a.toDate === null)
+    ? assignments.find(a =>
+        a.queuePatientId === selectedQueuePatient.id &&
+        (a.toDate === null || a.toDate >= today())
+      )
     : null;
   const queueAssignedRoom = queueAssignment ? rooms.find(r => r.id === queueAssignment.roomId) : null;
 
@@ -110,12 +115,13 @@ const RoomAssignmentManager: React.FC<Props> = ({ patients, rooms, assignments, 
 
       // Tryb: queue patient — tworzymy assignment z queuePatientId, patientId pusty
       if (selectedQueuePatient) {
-        // Zamknij stary queue-assignment jeśli był (zmiana pokoju przed przyjazdem)
+        // Stary queue-assignment? (zmiana pokoju przed przyjazdem)
+        // Usuwamy go całkowicie — to była rezerwacja, nie historia faktycznego pobytu.
         if (queueAssignment) {
           if (queueAssignment.roomId === moveRoomId) {
             return alert(`${selectedQueuePatient.firstName} ma już zarezerwowany pokój ${room.number}.`);
           }
-          await closeAssignment(queueAssignment.id, moveDate);
+          await deleteAssignment(queueAssignment.id);
         }
         await createAssignment({
           patientId: '', // pusty — uzupełni się gdy queue patient zostanie przyjęty do bazy
