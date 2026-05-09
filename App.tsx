@@ -173,8 +173,24 @@ const App: React.FC = () => {
         }
       }
 
-      // If admitting from queue, remove from queue
+      // If admitting from queue, migrate room reservations + remove from queue
       if (admittingQueueId) {
+        try {
+          // Najpierw przepisz wszystkie rezerwacje pokoju z queuePatientId na nowy patientId.
+          // Bez tego assignment zostałby sierotą — queue patient zaraz znika, a w bazie
+          // wisi assignment wskazujący na nieistniejący queue id (Plan tygodnia → "?").
+          const reservationsSnap = await getDocs(query(
+            collection(db, "roomAssignments"),
+            where("queuePatientId", "==", admittingQueueId)
+          ));
+          for (const resDoc of reservationsSnap.docs) {
+            await updateDoc(doc(db, "roomAssignments", resDoc.id), {
+              patientId: docRef.id,
+            });
+          }
+        } catch (migErr) {
+          console.warn('Migracja rezerwacji pokoju z kolejki nie powiodła się:', migErr);
+        }
         try {
           await deleteDoc(doc(db, "queue", admittingQueueId));
         } catch (err) {

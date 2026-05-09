@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
-import { Room, RoomAssignment, getRoomOccupancy } from '../types';
-import { createRoom, updateRoom, deleteRoom, seedRooms } from '../services/roomsService';
-import { Plus, Edit2, Trash2, Check, X, AlertCircle, Database } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Patient, QueuePatient, Room, RoomAssignment, getRoomOccupancy } from '../types';
+import { createRoom, updateRoom, deleteRoom, seedRooms, deleteAssignment } from '../services/roomsService';
+import { Plus, Edit2, Trash2, Check, X, AlertCircle, Database, AlertTriangle } from 'lucide-react';
 
 interface Props {
   rooms: Room[];
   assignments: RoomAssignment[];
+  patients?: Patient[];
+  queue?: QueuePatient[];
 }
 
-const RoomsManagement: React.FC<Props> = ({ rooms, assignments }) => {
+const RoomsManagement: React.FC<Props> = ({ rooms, assignments, patients = [], queue = [] }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Room>>({});
   const [showAdd, setShowAdd] = useState(false);
@@ -241,6 +243,117 @@ const RoomsManagement: React.FC<Props> = ({ rooms, assignments }) => {
             )}
           </tbody>
         </table>
+      </div>
+
+      <OrphanAssignmentsSection
+        rooms={rooms}
+        assignments={assignments}
+        patients={patients}
+        queue={queue}
+      />
+    </div>
+  );
+};
+
+// --- Niewykorzystane rezerwacje (sieroty) ---
+
+interface OrphanProps {
+  rooms: Room[];
+  assignments: RoomAssignment[];
+  patients: Patient[];
+  queue: QueuePatient[];
+}
+
+const OrphanAssignmentsSection: React.FC<OrphanProps> = ({ rooms, assignments, patients, queue }) => {
+  const orphans = useMemo(() => {
+    const pIds = new Set(patients.map(p => p.id));
+    const qIds = new Set(queue.map(q => q.id));
+    return assignments.filter(a => {
+      const hasP = !!a.patientId && pIds.has(a.patientId);
+      const hasQ = !!a.queuePatientId && qIds.has(a.queuePatientId);
+      return !hasP && !hasQ;
+    });
+  }, [assignments, patients, queue]);
+
+  const handleDelete = async (a: RoomAssignment) => {
+    const room = rooms.find(r => r.id === a.roomId);
+    const roomLabel = room ? `pokój ${room.number}` : `roomId ${a.roomId}`;
+    const dateLabel = `${a.fromDate} → ${a.toDate || 'teraz'}`;
+    if (!confirm(`Usunąć osieroconą rezerwację (${roomLabel}, ${dateLabel})?\n\nTo działanie jest nieodwracalne. Wpis zostanie skasowany z bazy.`)) return;
+    try {
+      await deleteAssignment(a.id);
+    } catch (e) {
+      alert('Błąd: ' + (e as Error).message);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow">
+      <div className="border-b px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className={`w-5 h-5 ${orphans.length > 0 ? 'text-amber-600' : 'text-gray-400'}`} />
+          <h3 className="font-bold text-gray-900">Niewykorzystane rezerwacje</h3>
+          {orphans.length > 0 && (
+            <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2 py-0.5 rounded">
+              {orphans.length}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="p-4">
+        <p className="text-xs text-gray-600 mb-3">
+          Tu trafiają rezerwacje pokoju, których pacjent (z bazy lub kolejki) już nie istnieje.
+          Najczęstszy przypadek: pacjent został przyjęty z kolejki przed wprowadzeniem migracji rezerwacji
+          i jego stara rezerwacja osierociała. Plan tygodnia pokazuje wtedy „?" w pokoju.
+          Usunięcie wpisu naprawia tę sytuację.
+        </p>
+
+        {orphans.length === 0 ? (
+          <div className="text-center py-6 text-gray-400 text-sm">
+            ✓ Brak osieroconych rezerwacji. Wszystkie wpisy w bazie wskazują na istniejących pacjentów lub kolejkę.
+          </div>
+        ) : (
+          <table className="w-full text-sm border-collapse">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="border px-2 py-2 text-left">Pokój</th>
+                <th className="border px-2 py-2 text-left">Od</th>
+                <th className="border px-2 py-2 text-left">Do</th>
+                <th className="border px-2 py-2 text-left">Notatka</th>
+                <th className="border px-2 py-2 text-left">Powód osierocenia</th>
+                <th className="border px-2 py-2"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {orphans.map(a => {
+                const room = rooms.find(r => r.id === a.roomId);
+                let reason = '';
+                if (a.queuePatientId) reason = `nieistniejący queue (${a.queuePatientId.slice(0, 6)}…)`;
+                else if (a.patientId) reason = `nieistniejący patient (${a.patientId.slice(0, 6)}…)`;
+                else reason = 'brak patientId i queuePatientId';
+                return (
+                  <tr key={a.id} className="hover:bg-amber-50">
+                    <td className="border px-2 py-2 font-medium">{room ? `Pokój ${room.number}` : a.roomId}</td>
+                    <td className="border px-2 py-2">{a.fromDate}</td>
+                    <td className="border px-2 py-2">{a.toDate || <span className="text-gray-400">teraz</span>}</td>
+                    <td className="border px-2 py-2 text-xs text-gray-600">{a.notes || '—'}</td>
+                    <td className="border px-2 py-2 text-xs text-gray-500">{reason}</td>
+                    <td className="border px-2 py-2 text-right">
+                      <button
+                        onClick={() => handleDelete(a)}
+                        className="bg-red-100 hover:bg-red-200 text-red-700 px-2 py-1 rounded text-xs font-medium inline-flex items-center gap-1"
+                        title="Usuń osieroconą rezerwację"
+                      >
+                        <Trash2 className="w-3 h-3" /> Usuń
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
