@@ -137,6 +137,18 @@ const AdmissionsReport: React.FC<Props> = ({ queue, rooms, assignments }) => {
           Raport obejmuje pacjentów z kolejki ze statusem <strong>potwierdzony</strong> i planowaną datą przyjazdu w wybranym zakresie.
         </p>
 
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3 text-sm text-blue-900">
+          <strong>Jak przypisać pokój pacjentowi z kolejki?</strong>
+          <ol className="list-decimal list-inside mt-1 space-y-0.5 text-xs">
+            <li>Otwórz zakładkę <strong>Pokoje</strong> (górna nawigacja)</li>
+            <li>Sub-tab <strong>Przypisania</strong></li>
+            <li>W liście wyboru pacjenta zjedź do sekcji <strong>„Z kolejki — potwierdzeni"</strong></li>
+            <li>Wybierz pacjenta — daty pobytu wypełnią się automatycznie z kolejki</li>
+            <li>Wybierz pokój i kliknij <strong>Zarezerwuj</strong></li>
+          </ol>
+          <div className="text-xs mt-2">Po przypisaniu numer pokoju pojawi się tu w kolumnie „Pokój".</div>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <thead className="bg-gray-50">

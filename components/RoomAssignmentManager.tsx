@@ -166,6 +166,17 @@ const RoomAssignmentManager: React.FC<Props> = ({ patients, rooms, assignments, 
     } catch (e) { alert('Błąd: ' + (e as Error).message); }
   };
 
+  const handleCancelReservation = async () => {
+    if (!queueAssignment || !selectedQueuePatient) return;
+    const room = rooms.find(r => r.id === queueAssignment.roomId);
+    const roomLabel = room ? `pokój ${room.number}` : 'pokój';
+    if (!confirm(`Anulować rezerwację (${roomLabel}) dla ${selectedQueuePatient.firstName} ${selectedQueuePatient.lastName}?\n\nRezerwacja zostanie całkowicie usunięta — pokój zwolni się do innych przypisań.`)) return;
+    try {
+      await deleteAssignment(queueAssignment.id);
+      alert(`Rezerwacja dla ${selectedQueuePatient.firstName} anulowana.`);
+    } catch (e) { alert('Błąd: ' + (e as Error).message); }
+  };
+
   const handleDeleteHistory = async (a: RoomAssignment) => {
     if (!confirm(`Usunąć wpis w historii: pokój ${rooms.find(r => r.id === a.roomId)?.number} (${a.fromDate} → ${a.toDate || 'teraz'})?`)) return;
     try { await deleteAssignment(a.id); }
@@ -299,6 +310,15 @@ const RoomAssignmentManager: React.FC<Props> = ({ patients, rooms, assignments, 
                     onClick={handleEndStay}
                     className="bg-red-100 hover:bg-red-200 text-red-700 px-3 py-2 rounded text-sm font-medium flex items-center gap-1"
                     title="Zakończ pobyt w pokoju"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+                {queueAssignment && (
+                  <button
+                    onClick={handleCancelReservation}
+                    className="bg-red-100 hover:bg-red-200 text-red-700 px-3 py-2 rounded text-sm font-medium flex items-center gap-1"
+                    title="Anuluj rezerwację (usuń całkowicie)"
                   >
                     <X className="w-4 h-4" />
                   </button>
