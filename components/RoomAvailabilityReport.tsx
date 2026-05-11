@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Patient, Room, RoomAssignment } from '../types';
+import { Patient, Room, RoomAssignment, isCurrentAssignment } from '../types';
 import { Download, CheckCircle, AlertCircle } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -40,7 +40,7 @@ const RoomAvailabilityReport: React.FC<Props> = ({ patients, rooms, assignments 
 
   const info: RoomFreeInfo[] = useMemo(() => {
     return sortedRooms.map(room => {
-      const current = assignments.filter(a => a.roomId === room.id && a.toDate === null);
+      const current = assignments.filter(a => a.roomId === room.id && isCurrentAssignment(a));
       const occupants = current.map(a => {
         const p = patients.find(pp => pp.id === a.patientId);
         return {

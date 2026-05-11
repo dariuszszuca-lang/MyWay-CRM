@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Patient, Room, RoomAssignment, formatCurrency, getAmountDue } from '../types';
+import { Patient, Room, RoomAssignment, formatCurrency, getAmountDue, isCurrentAssignment } from '../types';
 import { Download, AlertTriangle } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -37,7 +37,7 @@ const DischargesReport: React.FC<Props> = ({ patients, rooms, assignments }) => 
   }, [patients, from, to]);
 
   const roomFor = (p: Patient): string => {
-    const assignment = assignments.find(a => a.patientId === p.id && a.toDate === null);
+    const assignment = assignments.find(a => a.patientId === p.id && isCurrentAssignment(a));
     if (!assignment) return '—';
     const room = rooms.find(r => r.id === assignment.roomId);
     return room ? room.number : '—';

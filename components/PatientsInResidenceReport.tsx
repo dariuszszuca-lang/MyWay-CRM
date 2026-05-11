@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Patient, Room, RoomAssignment } from '../types';
+import { Patient, Room, RoomAssignment, isCurrentAssignment } from '../types';
 import { Download, ArrowUp, ArrowDown } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -46,7 +46,7 @@ const PatientsInResidenceReport: React.FC<Props> = ({ patients, rooms, assignmen
     const out: Row[] = patients
       .filter(p => p.status !== 'discharged')
       .map(p => {
-        const assignment = assignments.find(a => a.patientId === p.id && a.toDate === null);
+        const assignment = assignments.find(a => a.patientId === p.id && isCurrentAssignment(a));
         const room = assignment ? rooms.find(r => r.id === assignment.roomId) : undefined;
         return {
           patient: p,

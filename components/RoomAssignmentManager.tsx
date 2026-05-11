@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Patient, QueuePatient, Room, RoomAssignment, getCurrentRoomAssignment, getRoomOccupancy } from '../types';
+import { Patient, QueuePatient, Room, RoomAssignment, getCurrentRoomAssignment, getRoomOccupancy, isCurrentAssignment } from '../types';
 import { createAssignment, closeAssignment, deleteAssignment, movePatientToRoom } from '../services/roomsService';
 import { UserPlus, Move, X, History, AlertTriangle, Clock } from 'lucide-react';
 
@@ -385,10 +385,10 @@ const RoomAssignmentManager: React.FC<Props> = ({ patients, rooms, assignments, 
 
       {/* Lista wszystkich aktualnie przypisanych */}
       <div className="bg-white rounded-lg shadow p-4">
-        <h3 className="text-sm font-bold text-gray-700 mb-2">Aktualnie w pokojach ({assignments.filter(a => a.toDate === null).length})</h3>
+        <h3 className="text-sm font-bold text-gray-700 mb-2">Aktualnie w pokojach ({assignments.filter(isCurrentAssignment).length})</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
           {sortedRooms.map(room => {
-            const inRoom = assignments.filter(a => a.roomId === room.id && a.toDate === null);
+            const inRoom = assignments.filter(a => a.roomId === room.id && isCurrentAssignment(a));
             const occ = inRoom.length;
             const isFull = occ >= room.capacity;
             return (

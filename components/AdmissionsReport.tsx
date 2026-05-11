@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { QueuePatient, Room, RoomAssignment, formatCurrency } from '../types';
+import { QueuePatient, Room, RoomAssignment, formatCurrency, isCurrentAssignment } from '../types';
 import { Download } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -57,7 +57,7 @@ const AdmissionsReport: React.FC<Props> = ({ queue, rooms, assignments }) => {
       .filter(a => a.queuePatientId === q.id)
       .sort((a, b) => b.fromDate.localeCompare(a.fromDate))[0];
     if (!assignment && q.linkedPatientId) {
-      assignment = assignments.find(a => a.patientId === q.linkedPatientId && a.toDate === null);
+      assignment = assignments.find(a => a.patientId === q.linkedPatientId && isCurrentAssignment(a));
     }
     if (!assignment) return '—';
     const room = rooms.find(r => r.id === assignment.roomId);

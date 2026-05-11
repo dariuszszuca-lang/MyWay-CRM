@@ -161,12 +161,20 @@ export interface RoomAssignment {
   queuePatientId?: string; // ref do queue/{id} — jeśli pokój zarezerwowany przed przyjęciem z kolejki
 }
 
+// Helper: przypisanie jest aktualne, jeśli nie ma toDate (null) lub jeszcze nie minęło (>= dziś).
+// Bo Marcin może zapisać rezerwację z toDate=plannedEndDate przy tworzeniu — to wciąż aktualne.
+const isCurrentAssignment = (a: RoomAssignment): boolean => {
+  if (a.toDate === null) return true;
+  const today = new Date().toISOString().slice(0, 10);
+  return a.toDate >= today;
+};
+
 // Helper: który pokój ma pacjent teraz?
 export const getCurrentRoomAssignment = (
   patientId: string,
   assignments: RoomAssignment[]
 ): RoomAssignment | null => {
-  return assignments.find(a => a.patientId === patientId && a.toDate === null) || null;
+  return assignments.find(a => a.patientId === patientId && isCurrentAssignment(a)) || null;
 };
 
 // Helper: ile osób jest teraz w pokoju?
@@ -174,7 +182,7 @@ export const getRoomOccupancy = (
   roomId: string,
   assignments: RoomAssignment[]
 ): number => {
-  return assignments.filter(a => a.roomId === roomId && a.toDate === null).length;
+  return assignments.filter(a => a.roomId === roomId && isCurrentAssignment(a)).length;
 };
 
 // Helper: wszyscy aktualni mieszkańcy pokoju
@@ -182,8 +190,11 @@ export const getRoomCurrentPatients = (
   roomId: string,
   assignments: RoomAssignment[]
 ): RoomAssignment[] => {
-  return assignments.filter(a => a.roomId === roomId && a.toDate === null);
+  return assignments.filter(a => a.roomId === roomId && isCurrentAssignment(a));
 };
+
+// Export żeby komponenty mogły używać tej samej semantyki
+export { isCurrentAssignment };
 
 // Seed 10 pokoi — wartości od Marcina (5.05.2026)
 export const ROOMS_SEED: Omit<Room, 'id'>[] = [
