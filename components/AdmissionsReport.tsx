@@ -50,13 +50,17 @@ const AdmissionsReport: React.FC<Props> = ({ queue, rooms, assignments }) => {
   }, [queue, from, to]);
 
   // Numer pokoju dla queue patient: szukaj po queuePatientId, fallback po linkedPatientId
+  // UWAGA: rezerwacje queue MAJĄ toDate=plannedEndDate, więc bez filtru toDate===null.
+  // Bierzemy najnowszą rezerwację (ostatnia po fromDate desc) gdyby było wiele.
   const roomFor = (q: QueuePatient): string => {
-    let assignment = assignments.find(a => a.queuePatientId === q.id && a.toDate === null);
+    let assignment = assignments
+      .filter(a => a.queuePatientId === q.id)
+      .sort((a, b) => b.fromDate.localeCompare(a.fromDate))[0];
     if (!assignment && q.linkedPatientId) {
       assignment = assignments.find(a => a.patientId === q.linkedPatientId && a.toDate === null);
     }
     if (!assignment) return '—';
-    const room = rooms.find(r => r.id === assignment!.roomId);
+    const room = rooms.find(r => r.id === assignment.roomId);
     return room ? room.number : '—';
   };
 
