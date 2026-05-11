@@ -161,12 +161,14 @@ export interface RoomAssignment {
   queuePatientId?: string; // ref do queue/{id} — jeśli pokój zarezerwowany przed przyjęciem z kolejki
 }
 
-// Helper: przypisanie jest aktualne, jeśli nie ma toDate (null) lub jeszcze nie minęło (>= dziś).
-// Bo Marcin może zapisać rezerwację z toDate=plannedEndDate przy tworzeniu — to wciąż aktualne.
+// Helper: przypisanie jest aktualne DZIŚ, jeśli:
+//  - fromDate <= dziś (już się zaczęło, queue patient z fromDate=jutro NIE jest aktualny)
+//  - oraz toDate === null (brak końca) lub toDate > dziś (koniec w przyszłości; wypisany DZIŚ = toDate=dziś NIE jest aktualny — pokój wolny od dziś)
 const isCurrentAssignment = (a: RoomAssignment): boolean => {
-  if (a.toDate === null) return true;
   const today = new Date().toISOString().slice(0, 10);
-  return a.toDate >= today;
+  if (a.fromDate > today) return false;
+  if (a.toDate === null) return true;
+  return a.toDate > today;
 };
 
 // Helper: który pokój ma pacjent teraz?
