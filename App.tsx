@@ -345,15 +345,20 @@ const App: React.FC = () => {
       await updateDoc(patientRef, updatePayload);
 
       // 2b. Auto-zwolnienie pokoju: zamknij aktywny RoomAssignment z toDate = dischargeDate.
+      // UWAGA: pobieramy WSZYSTKIE assignments pacjenta i filtrujemy client-side, bo
+      // aktualne przypisanie może mieć toDate=plannedEndDate w przyszłości (nie null).
       // Try/catch — błąd tu nie blokuje wypisu (sam wypis już zapisany).
       try {
-        const activeAssignmentsSnap = await getDocs(query(
+        const allAssignmentsSnap = await getDocs(query(
           collection(db, "roomAssignments"),
-          where("patientId", "==", patient.id),
-          where("toDate", "==", null)
+          where("patientId", "==", patient.id)
         ));
-        for (const docSnap of activeAssignmentsSnap.docs) {
-          await closeAssignment(docSnap.id, dischargeData.dischargeDate);
+        for (const docSnap of allAssignmentsSnap.docs) {
+          const a = docSnap.data() as { toDate: string | null };
+          const isCurrent = a.toDate === null || a.toDate >= dischargeData.dischargeDate;
+          if (isCurrent) {
+            await closeAssignment(docSnap.id, dischargeData.dischargeDate);
+          }
         }
       } catch (roomErr) {
         console.error("Nie udało się auto-zwolnić pokoju przy wypisie:", roomErr);
