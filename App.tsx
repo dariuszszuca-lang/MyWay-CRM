@@ -13,7 +13,7 @@ import { db, auth } from './firebaseConfig';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, getDocs, where } from 'firebase/firestore';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { sendWelcomeEmail, confirmPatientEmail, dischargePatientEmail } from './services/getResponseService';
-import { closeAssignment } from './services/roomsService';
+import { closeAssignment, syncAssignmentsToPatientEndDate } from './services/roomsService';
 
 // --- KONFIGURACJA DOSTĘPU (BIAŁA LISTA) ---
 const ALLOWED_EMAILS = [
@@ -209,9 +209,31 @@ const App: React.FC = () => {
 
   const handleUpdatePatient = async (updatedPatient: Patient) => {
     try {
+      // Zapamiętaj starą datę końca przed updateDoc (do propagacji do przypisań)
+      const previousPatient = patients.find(p => p.id === updatedPatient.id);
+      const oldEndDate = previousPatient?.treatmentEndDate;
+
       const patientRef = doc(db, "patients", updatedPatient.id);
       const { id, ...dataToUpdate } = updatedPatient;
       await updateDoc(patientRef, dataToUpdate);
+
+      // Auto-sync: jeśli zmieniono treatmentEndDate, zaktualizuj toDate w aktywnych
+      // przypisaniach pokoju (tylko te zsynchronizowane wcześniej; open-ended, historyczne
+      // i ręcznie zmienione zostają nietknięte). Błąd tu nie blokuje zapisu pacjenta.
+      if (oldEndDate && oldEndDate !== updatedPatient.treatmentEndDate) {
+        try {
+          const updated = await syncAssignmentsToPatientEndDate({
+            patientId: updatedPatient.id,
+            oldEndDate,
+            newEndDate: updatedPatient.treatmentEndDate,
+          });
+          if (updated > 0) {
+            console.log(`✓ Zsynchronizowano ${updated} przypisanie/a pokoju z nową datą końca terapii`);
+          }
+        } catch (syncErr) {
+          console.warn('Nie udało się zsynchronizować przypisań pokoju:', syncErr);
+        }
+      }
     } catch (err) {
       alert("Błąd podczas aktualizacji danych.");
       console.error(err);
