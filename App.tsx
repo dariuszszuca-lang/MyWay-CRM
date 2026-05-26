@@ -14,15 +14,9 @@ import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, order
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { sendWelcomeEmail, confirmPatientEmail, dischargePatientEmail } from './services/getResponseService';
 import { closeAssignment, syncAssignmentsToPatientEndDate } from './services/roomsService';
+import { canAccessApp, canAccessStats } from './services/accessControl';
 
-// --- KONFIGURACJA DOSTĘPU (BIAŁA LISTA) ---
-const ALLOWED_EMAILS = [
-  "dariusz.szuca@gmail.com",
-  "krystiannagaba@gmail.com",
-  "mywaymarcin@gmail.com",
-  "npucz708@gmail.com",
-  "gabinet.osrodekmyway@gmail.com",
-];
+type ActiveTab = 'form' | 'list' | 'queue' | 'stats' | 'rooms' | 'reports';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -31,7 +25,7 @@ const App: React.FC = () => {
 
   const [patients, setPatients] = useState<Patient[]>([]);
   const [queue, setQueue] = useState<QueuePatient[]>([]);
-  const [activeTab, setActiveTab] = useState<'form' | 'list' | 'queue' | 'stats' | 'rooms' | 'reports'>('form');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('form');
   const [dataLoading, setDataLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,7 +38,7 @@ const App: React.FC = () => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
         const userEmail = currentUser.email?.toLowerCase() || '';
-        const isAllowed = ALLOWED_EMAILS.some(allowed => allowed.toLowerCase() === userEmail);
+        const isAllowed = canAccessApp(userEmail);
         if (isAllowed) {
           setUser(currentUser);
           setPermissionError(null);
@@ -464,7 +458,15 @@ const App: React.FC = () => {
   };
 
   // Cancel prefill when switching away from form
-  const switchTab = (tab: 'form' | 'list' | 'queue' | 'stats' | 'rooms' | 'reports') => {
+  const canViewStats = canAccessStats(user?.email);
+
+  const switchTab = (tab: ActiveTab) => {
+    if (tab === 'stats' && !canViewStats) {
+      setError("Brak uprawnień do statystyk.");
+      setActiveTab('form');
+      return;
+    }
+
     if (tab !== 'form') {
       setPrefillQueue(null);
       setAdmittingQueueId(null);
@@ -556,17 +558,19 @@ const App: React.FC = () => {
                 )}
               </button>
 
-              <button
-                onClick={() => switchTab('stats')}
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
-                  activeTab === 'stats'
-                    ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <BarChart3 className="w-4 h-4" />
-                Statystyki
-              </button>
+              {canViewStats && (
+                <button
+                  onClick={() => switchTab('stats')}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
+                    activeTab === 'stats'
+                      ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  Statystyki
+                </button>
+              )}
 
               <button
                 onClick={() => switchTab('rooms')}
@@ -738,7 +742,7 @@ const App: React.FC = () => {
               </div>
             )}
 
-            {activeTab === 'stats' && (
+            {activeTab === 'stats' && canViewStats && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <StatsDashboard patients={patients} />
               </div>
