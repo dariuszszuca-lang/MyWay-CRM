@@ -755,7 +755,7 @@ exports.createPatientFromCRM = functions
   });
 
 // =======================================================================
-// PAYMENT ALERT — codzienne sprawdzanie, 7 dni przed końcem terapii
+// PAYMENT ALERT — codzienne sprawdzanie, 14 dni przed końcem terapii
 // =======================================================================
 
 exports.paymentAlertDaily = functions.pubsub
@@ -763,7 +763,7 @@ exports.paymentAlertDaily = functions.pubsub
   .timeZone("Europe/Warsaw")
   .onRun(async () => {
     const ALERT_EMAIL = "mywaymarcin@gmail.com";
-    const DAYS_BEFORE = 7;
+    const DAYS_BEFORE = 14;
 
     const today = new Date();
     const alertDate = new Date(today.getTime() + DAYS_BEFORE * 24 * 60 * 60 * 1000);

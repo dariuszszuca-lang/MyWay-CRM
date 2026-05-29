@@ -617,15 +617,16 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* Payment Alert — 7 days before therapy end */}
+        {/* Payment Alert — 14 days before therapy end */}
         {(() => {
+          const paymentAlertDaysBefore = 14;
           const today = new Date();
-          const in7days = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+          const alertWindowEnd = new Date(today.getTime() + paymentAlertDaysBefore * 24 * 60 * 60 * 1000);
           const alerts = patients.filter(p => {
             if (p.status === 'discharged' || !p.treatmentEndDate) return false;
             const endDate = new Date(p.treatmentEndDate);
             const due = getAmountDue(p);
-            return due > 0 && endDate <= in7days && endDate >= today;
+            return due > 0 && endDate <= alertWindowEnd && endDate >= today;
           });
           if (alerts.length === 0) return null;
           return (
@@ -633,7 +634,7 @@ const App: React.FC = () => {
               <div className="flex items-center gap-2 mb-3">
                 <AlertTriangle className="w-5 h-5 text-amber-600" />
                 <h3 className="font-bold text-amber-800 text-sm">
-                  Przypomnienie o płatnościach — terapia kończy się w ciągu 7 dni
+                  Przypomnienie o płatnościach — terapia kończy się w ciągu {paymentAlertDaysBefore} dni
                 </h3>
               </div>
               <div className="space-y-2">
