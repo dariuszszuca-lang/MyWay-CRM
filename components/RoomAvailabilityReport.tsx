@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Patient, Room, RoomAssignment, isCurrentAssignment } from '../types';
+import { Patient, Room, RoomAssignment, QueuePatient, isCurrentAssignment } from '../types';
 import { Download, CheckCircle, AlertCircle } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -9,6 +9,7 @@ interface Props {
   patients: Patient[];
   rooms: Room[];
   assignments: RoomAssignment[];
+  queue?: QueuePatient[];
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -34,9 +35,26 @@ interface RoomFreeInfo {
   isFullForever: boolean;     // pełny i nikt nie ma planowanej daty wypisu
 }
 
-const RoomAvailabilityReport: React.FC<Props> = ({ patients, rooms, assignments }) => {
+const RoomAvailabilityReport: React.FC<Props> = ({ patients, rooms, assignments, queue = [] }) => {
   const sortedRooms = useMemo(() => [...rooms].sort((a, b) => (a.order || 99) - (b.order || 99)), [rooms]);
   const t = today();
+
+  // Kto WCHODZI — rezerwacje (przypisanie pokoju z przyszłą datą fromDate, zwykle z kolejki).
+  // Mapa roomId -> lista nadchodzących wejść {imię, data} w horyzoncie 28 dni.
+  const arrivalsByRoom = useMemo(() => {
+    const horizon = addDays(t, 28);
+    const map: Record<string, { name: string; date: string }[]> = {};
+    for (const a of assignments) {
+      if (a.fromDate <= t || a.fromDate > horizon) continue; // tylko przyszłe wejścia w horyzoncie
+      const q = a.queuePatientId ? queue.find(qq => qq.id === a.queuePatientId) : undefined;
+      const p = a.patientId ? patients.find(pp => pp.id === a.patientId) : undefined;
+      const person = q || p;
+      if (!person) continue;
+      (map[a.roomId] ||= []).push({ name: `${person.firstName} ${person.lastName}`, date: a.fromDate });
+    }
+    for (const k in map) map[k].sort((x, y) => x.date.localeCompare(y.date));
+    return map;
+  }, [assignments, queue, patients, t]);
 
   const info: RoomFreeInfo[] = useMemo(() => {
     return sortedRooms.map(room => {
@@ -305,6 +323,11 @@ const RoomAvailabilityReport: React.FC<Props> = ({ patients, rooms, assignments 
                     Pokój <strong>{r.roomNumber}</strong>: <strong className="text-teal-700">{r.freeSpaces} {plMiejsca(r.freeSpaces)}</strong> (z {r.capacity})
                     {r.departing.length > 0 && (
                       <span className="text-xs text-gray-500 ml-2">— wychodzą: {r.departing.join(', ')}</span>
+                    )}
+                    {(arrivalsByRoom[r.roomId] || []).length > 0 && (
+                      <span className="text-xs text-green-700 ml-2 font-medium">
+                        wchodzą: {(arrivalsByRoom[r.roomId] || []).map(x => `${x.name} (od ${formatDay(x.date)})`).join(', ')}
+                      </span>
                     )}
                   </li>
                 ))}

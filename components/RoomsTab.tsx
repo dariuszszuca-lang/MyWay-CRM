@@ -63,7 +63,7 @@ const RoomsTab: React.FC<Props> = ({ patients, queue = [] }) => {
         <RoomAssignmentManager patients={patients} rooms={rooms} assignments={assignments} queue={queue} />
       )}
       {subTab === 'availability' && (
-        <RoomAvailabilityReport patients={patients} rooms={rooms} assignments={assignments} />
+        <RoomAvailabilityReport patients={patients} rooms={rooms} assignments={assignments} queue={queue} />
       )}
       {subTab === 'timeline' && (
         <RoomTimelineReport patients={patients} rooms={rooms} assignments={assignments} queue={queue} />
