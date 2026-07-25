@@ -321,6 +321,36 @@ export const formatOrderAddress = (shippingAddress: OrderShippingAddress | null)
   return [shippingAddress.name, a.line1, a.line2, cityLine, a.country].filter(Boolean) as string[];
 };
 
+// Kod na darmowy Dziennik (kupon 100% w Stripe).
+// Dwie niezależne informacje: „zrealizowany" wie Stripe (nie da się tego kliknąć),
+// „wydany" zaznacza Marcin ręcznie, bo Stripe nie wie, komu daliśmy kod do ręki.
+export interface PromoCode {
+  code: string;
+  couponId: string | null;
+  couponName: string | null;
+  discount: string | null;      // np. "100%"
+  timesRedeemed: number;
+  maxRedemptions: number | null;
+  redeemed: boolean;            // ze Stripe, tylko do odczytu
+  active: boolean;              // Stripe wyłącza kod po wykorzystaniu
+  createdAt: string | null;
+  expiresAt: string | null;
+  issued: boolean;              // warstwa ręczna
+  issuedTo: string | null;
+  note: string | null;
+  issuedAt: string | null;
+  updatedBy: string | null;
+}
+
+export type CodeFilter = 'all' | 'free' | 'issued' | 'redeemed';
+
+// Trzy sytuacje, które trzeba rozróżnić: kod w szufladzie, kod wydany ale nieużyty, kod zużyty.
+export const codeState = (c: PromoCode): 'redeemed' | 'issued' | 'free' => {
+  if (c.redeemed) return 'redeemed';
+  if (c.issued) return 'issued';
+  return 'free';
+};
+
 // Czy ostatni mail dla AKTUALNEGO statusu się nie udał (czerwony znacznik w tabeli).
 export const hasFailedStatusEmail = (order: Order): boolean => {
   const forStatus = order.statusEmails.filter(e => e.status === order.status);

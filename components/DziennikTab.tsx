@@ -2,13 +2,18 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Order, OrderStatus, ORDER_STATUS_LABELS } from '../types';
 import { listOrders, setOrderStatus, resendStatusEmail } from '../services/ordersApi';
 import OrdersList from './OrdersList';
-import { RefreshCw, Package, Truck, ShoppingBag, AlertTriangle } from 'lucide-react';
+import CodesList from './CodesList';
+import { RefreshCw, Package, Truck, ShoppingBag, AlertTriangle, ClipboardList, Ticket } from 'lucide-react';
 
-// Zamówienia Dziennika. Dane pochodzą z projektu EduWay (tam wpada płatność),
-// więc nie ma tu nasłuchu na bazę CRM. Lista odświeża się przyciskiem i sama co minutę.
+// Zamówienia Dziennika i kody na darmowy Dziennik.
+// Dane pochodzą z projektu EduWay (tam wpada płatność), więc nie ma tu nasłuchu na bazę CRM.
+// Lista odświeża się przyciskiem i sama co minutę.
 const AUTO_REFRESH_MS = 60_000;
 
+type SubTab = 'zamowienia' | 'kody';
+
 const DziennikTab: React.FC = () => {
+  const [subTab, setSubTab] = useState<SubTab>('zamowienia');
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,15 +39,16 @@ const DziennikTab: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    load(true);
-  }, [load]);
+    if (subTab === 'zamowienia') load(true);
+  }, [load, subTab]);
 
   useEffect(() => {
+    if (subTab !== 'zamowienia') return;
     const timer = setInterval(() => {
       if (!busyRef.current) load(false);
     }, AUTO_REFRESH_MS);
     return () => clearInterval(timer);
-  }, [load]);
+  }, [load, subTab]);
 
   const handleChangeStatus = async (order: Order, status: OrderStatus) => {
     setBusyOrderId(order.id);
@@ -87,64 +93,89 @@ const DziennikTab: React.FC = () => {
     o => o.status !== 'cancelled' && o.status !== 'shipped' && !o.shippingAddress,
   ).length;
 
+  const tabBtn = (id: SubTab, label: string, Icon: any) => (
+    <button
+      onClick={() => setSubTab(id)}
+      className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
+        subTab === id
+          ? 'bg-blue-50 text-blue-700 border border-blue-100'
+          : 'text-gray-600 hover:bg-gray-100 border border-transparent'
+      }`}
+    >
+      <Icon className="w-4 h-4" />
+      {label}
+    </button>
+  );
+
   return (
     <div className="space-y-4">
-      {/* Pasek stanu: co czeka na Marcina */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <div className="bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg text-sm font-medium text-blue-800">
-          <ShoppingBag className="w-3.5 h-3.5 inline mr-1" />
-          Nowe zamówienia: {countBy('new')}
-        </div>
-        <div className="bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg text-sm font-medium text-amber-800">
-          <Package className="w-3.5 h-3.5 inline mr-1" />
-          W realizacji: {countBy('accepted') + countBy('packing')}
-        </div>
-        <div className="bg-green-50 border border-green-200 px-3 py-1.5 rounded-lg text-sm font-medium text-green-800">
-          <Truck className="w-3.5 h-3.5 inline mr-1" />
-          Wysłane: {countBy('shipped')}
-        </div>
-        {missingAddress > 0 && (
-          <div className="bg-amber-100 border border-amber-300 px-3 py-1.5 rounded-lg text-sm font-medium text-amber-900">
-            <AlertTriangle className="w-3.5 h-3.5 inline mr-1" />
-            Bez adresu wysyłki: {missingAddress}
-          </div>
-        )}
-
-        <div className="ml-auto flex items-center gap-3">
-          {lastRefresh && (
-            <span className="text-xs text-gray-400">
-              Odświeżono {lastRefresh.toLocaleTimeString('pl-PL')}
-            </span>
-          )}
-          <button
-            onClick={() => load(true)}
-            disabled={loading}
-            className="flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-teal-700 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            Odśwież
-          </button>
-        </div>
+      <div className="flex flex-wrap gap-2 bg-white p-2 rounded-lg shadow-sm">
+        {tabBtn('zamowienia', 'Zamówienia', ClipboardList)}
+        {tabBtn('kody', 'Kody na Dziennik', Ticket)}
       </div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-          <strong className="font-bold">Nie udało się pobrać zamówień: </strong>{error}
-        </div>
-      )}
+      {subTab === 'kody' && <CodesList />}
 
-      {loading && orders.length === 0 ? (
-        <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100 flex items-center justify-center gap-2 text-gray-500">
-          <RefreshCw className="w-5 h-5 animate-spin text-teal-600" />
-          Pobieram zamówienia...
-        </div>
-      ) : (
-        <OrdersList
-          orders={orders}
-          onChangeStatus={handleChangeStatus}
-          onResendEmail={handleResendEmail}
-          busyOrderId={busyOrderId}
-        />
+      {subTab === 'zamowienia' && (
+        <>
+          {/* Pasek stanu: co czeka na Marcina */}
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg text-sm font-medium text-blue-800">
+              <ShoppingBag className="w-3.5 h-3.5 inline mr-1" />
+              Nowe zamówienia: {countBy('new')}
+            </div>
+            <div className="bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg text-sm font-medium text-amber-800">
+              <Package className="w-3.5 h-3.5 inline mr-1" />
+              W realizacji: {countBy('accepted') + countBy('packing')}
+            </div>
+            <div className="bg-green-50 border border-green-200 px-3 py-1.5 rounded-lg text-sm font-medium text-green-800">
+              <Truck className="w-3.5 h-3.5 inline mr-1" />
+              Wysłane: {countBy('shipped')}
+            </div>
+            {missingAddress > 0 && (
+              <div className="bg-amber-100 border border-amber-300 px-3 py-1.5 rounded-lg text-sm font-medium text-amber-900">
+                <AlertTriangle className="w-3.5 h-3.5 inline mr-1" />
+                Bez adresu wysyłki: {missingAddress}
+              </div>
+            )}
+
+            <div className="ml-auto flex items-center gap-3">
+              {lastRefresh && (
+                <span className="text-xs text-gray-400">
+                  Odświeżono {lastRefresh.toLocaleTimeString('pl-PL')}
+                </span>
+              )}
+              <button
+                onClick={() => load(true)}
+                disabled={loading}
+                className="flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-teal-700 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                Odśwież
+              </button>
+            </div>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+              <strong className="font-bold">Nie udało się pobrać zamówień: </strong>{error}
+            </div>
+          )}
+
+          {loading && orders.length === 0 ? (
+            <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100 flex items-center justify-center gap-2 text-gray-500">
+              <RefreshCw className="w-5 h-5 animate-spin text-teal-600" />
+              Pobieram zamówienia...
+            </div>
+          ) : (
+            <OrdersList
+              orders={orders}
+              onChangeStatus={handleChangeStatus}
+              onResendEmail={handleResendEmail}
+              busyOrderId={busyOrderId}
+            />
+          )}
+        </>
       )}
     </div>
   );

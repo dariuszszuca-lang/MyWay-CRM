@@ -5,7 +5,7 @@
 // i porównuje mail z listą dostępu. Spec: klienci/myway/projekty/dziennik-panel-zamowien/SPEC.md
 
 import { auth } from '../firebaseConfig';
-import { Order, OrderStatus } from '../types';
+import { Order, OrderStatus, PromoCode } from '../types';
 
 const ORDERS_API_URL = 'https://europe-west1-eduway-f13c4.cloudfunctions.net/ordersApi';
 
@@ -66,4 +66,19 @@ export const setOrderStatus = async (orderId: string, status: OrderStatus): Prom
 
 export const resendStatusEmail = async (orderId: string, status: OrderStatus): Promise<StatusChangeResult> => {
   return await authorizedFetch({ orderId, status }, 'resendEmail');
+};
+
+// --- Kody na darmowy Dziennik ---
+
+export const listCodes = async (): Promise<PromoCode[]> => {
+  const data = await authorizedFetch(null, 'codes');
+  return Array.isArray(data?.codes) ? (data.codes as PromoCode[]) : [];
+};
+
+// Zapisuje TYLKO warstwę ręczną (komu wydany, notatka). Kodu i rabatu w Stripe nie ruszamy.
+export const saveCodeNote = async (
+  code: string,
+  fields: { issued: boolean; issuedTo: string; note: string },
+): Promise<{ ok?: boolean }> => {
+  return await authorizedFetch({ code, ...fields }, 'codeNote');
 };

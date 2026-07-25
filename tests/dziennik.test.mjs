@@ -13,6 +13,7 @@ const types = read('types.ts');
 const api = read('services/ordersApi.ts');
 const tab = read('components/DziennikTab.tsx');
 const list = read('components/OrdersList.tsx');
+const codes = read('components/CodesList.tsx');
 
 test('App.tsx ma zakładkę dziennik wpiętą we wszystkich czterech miejscach', () => {
   assert.match(app, /import DziennikTab from '\.\/components\/DziennikTab'/, 'brak importu komponentu');
@@ -69,4 +70,43 @@ test('nieudany mail jest widoczny i da się go ponowić', () => {
 
 test('brak adresu wysyłki jest oznaczony, bo bez adresu nie ma czego pakować', () => {
   assert.match(list, /Brak adresu, dopytaj klienta/, 'brak ostrzeżenia o pustym adresie');
+});
+
+// --- kody na darmowy Dziennik ---
+
+test('kody są podzakładką w Dziennik, nie osobną pozycją w górnym menu', () => {
+  assert.match(tab, /import CodesList from '\.\/CodesList'/, 'brak importu listy kodów');
+  assert.match(tab, /<CodesList \/>/, 'kody nie są renderowane w zakładce Dziennik');
+  assert.match(tab, /'zamowienia' \| 'kody'/, 'brak przełącznika podzakładek');
+  assert.doesNotMatch(app, /switchTab\('kody'\)/, 'kody nie powinny być osobną zakładką w menu głównym');
+});
+
+test('trzy stany kodu są rozróżnione: wolny, wydany nieużyty, zrealizowany', () => {
+  assert.match(types, /codeState/, 'brak funkcji rozstrzygającej stan kodu');
+  for (const stan of ['free', 'issued', 'redeemed']) {
+    assert.match(types, new RegExp(`'${stan}'`), `brak stanu ${stan}`);
+  }
+  assert.match(codes, /Wydany, nieużyty/, 'brak stanu wydany nieużyty w interfejsie');
+  assert.match(codes, /Zrealizowany/, 'brak stanu zrealizowany');
+});
+
+test('realizacja kodu jest tylko do odczytu, bo o niej decyduje Stripe', () => {
+  // W formularzu edycji wolno zmieniać wyłącznie warstwę ręczną
+  const formularz = codes.match(/isEditing \? \([\s\S]*?\) : \(/g) || [];
+  const polaEdycji = formularz.join(' ');
+  assert.doesNotMatch(polaEdycji, /editForm\.redeemed|redeemed:/, 'nie wolno klikać realizacji kodu, to wie Stripe');
+  assert.match(codes, /editForm\.issued/, 'brak zaznaczania wydania kodu');
+  assert.match(codes, /editForm\.issuedTo/, 'brak pola komu wydany');
+  assert.match(codes, /editForm\.note/, 'brak pola notatki');
+});
+
+test('interfejs tłumaczy różnicę między zrealizowanym a wydanym', () => {
+  assert.match(codes, /Stripe/, 'brak wyjaśnienia skąd bierze się realizacja');
+  assert.match(codes, /nie da się (tego )?(zmienić|kliknąć)/i, 'brak informacji, że realizacji nie da się zmienić');
+});
+
+test('warstwa API kodów istnieje i nie modyfikuje kodów w Stripe', () => {
+  assert.match(api, /listCodes/, 'brak pobierania kodów');
+  assert.match(api, /saveCodeNote/, 'brak zapisu notatki');
+  assert.doesNotMatch(api, /deactivateCode|createCode|updateCoupon/, 'API nie powinno modyfikować kodów w Stripe');
 });

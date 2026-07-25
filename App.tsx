@@ -777,8 +777,8 @@ const App: React.FC = () => {
             {activeTab === 'dziennik' && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="mb-6">
-                  <h2 className="text-2xl font-bold text-gray-800">Zamówienia Dziennika</h2>
-                  <p className="text-gray-500">Sprzedaż z edu-myway.pl. Zmiana statusu wysyła maila do klienta.</p>
+                  <h2 className="text-2xl font-bold text-gray-800">Dziennik</h2>
+                  <p className="text-gray-500">Zamówienia ze sklepu edu-myway.pl i kody na darmowy Dziennik. Zmiana statusu wysyła maila do klienta.</p>
                 </div>
                 <DziennikTab />
               </div>
