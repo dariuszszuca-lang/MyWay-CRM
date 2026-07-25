@@ -110,3 +110,23 @@ test('warstwa API kodów istnieje i nie modyfikuje kodów w Stripe', () => {
   assert.match(api, /saveCodeNote/, 'brak zapisu notatki');
   assert.doesNotMatch(api, /deactivateCode|createCode|updateCoupon/, 'API nie powinno modyfikować kodów w Stripe');
 });
+
+// --- Grupa VIP: dodatkowe usługi i wpłaty (bez kwoty bazowej) ---
+
+test('Grupa VIP ma wpłaty i usługi dodatkowe, ale nie ma kwoty całkowitej', () => {
+  const form = read('components/PatientForm.tsx');
+
+  // Kwota bazowa i termin zapłaty tylko dla pakietów innych niż VIP
+  assert.match(form, /\{!isVip && \(/, 'kwota całkowita powinna być ukryta dla VIP');
+  assert.match(form, /Kwota całkowita \(PLN\)/, 'brak pola kwoty całkowitej dla zwykłych pakietów');
+
+  // Wpłaty i usługi NIE moga byc juz schowane w gałęzi else dla nie-VIP
+  assert.doesNotMatch(form, /\{isVip \? \(/, 'VIP nie powinien podmieniać całej sekcji rozliczeń');
+  assert.match(form, /Dodaj wpłatę/, 'brak dodawania wpłat');
+  assert.match(form, /Dodaj usługę/, 'brak dodawania usług dodatkowych');
+});
+
+test('VIP bez dodatków nie udaje, że jest opłacony', () => {
+  const form = read('components/PatientForm.tsx');
+  assert.match(form, /Brak dodatkowych kosztów/, 'VIP bez usług i wpłat powinien pokazywać neutralny komunikat, nie "Opłacone w całości"');
+});

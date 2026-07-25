@@ -415,13 +415,14 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
             </div>
           </div>
 
-          {isVip ? (
+          {isVip && (
             <div className="mt-6 bg-purple-50 p-4 rounded-lg border border-purple-100 text-purple-700 font-medium text-sm">
-              Grupa VIP — bez kwoty do rozliczenia
+              Grupa VIP, pakiet bez kwoty do rozliczenia. Poniżej dopiszesz dodatkowe usługi i wpłaty za nie.
             </div>
-          ) : (
-            <>
-              {/* Kwota całkowita + termin */}
+          )}
+
+          {/* Kwota całkowita + termin. VIP nie ma kwoty bazowej, płaci tylko za dodatki. */}
+          {!isVip && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-6 bg-gray-50 p-5 rounded-lg border border-gray-200">
                 <div>
                   <label className="text-xs text-gray-700 font-bold mb-1 block uppercase">Kwota całkowita (PLN)</label>
@@ -432,8 +433,9 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
                   <input type="date" name="paymentDeadline" value={formData.paymentDeadline} onChange={handleChange} className={inputClass} />
                 </div>
               </div>
+          )}
 
-              {/* Wpłaty — dynamiczna lista */}
+              {/* Wpłaty — dynamiczna lista (także dla Grupy VIP: wpłaty za dodatki) */}
               <div className="mt-4 space-y-3">
                 {payments.map((payment, index) => (
                   <div key={index} className="bg-gray-50 p-4 rounded-lg border border-gray-200 relative">
@@ -552,12 +554,12 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
                     <span>Wpłacono łącznie: {formatCurrency(totalPaid)}</span>
                   </div>
                   <div className={`font-bold text-lg ${amountDue > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                    {amountDue > 0 ? `Do zapłaty: ${formatCurrency(amountDue)}` : 'Opłacone w całości ✓'}
+                    {isVip && totalServices === 0 && totalPaid === 0
+                      ? <span className="text-gray-500 font-medium text-base">Brak dodatkowych kosztów</span>
+                      : amountDue > 0 ? `Do zapłaty: ${formatCurrency(amountDue)}` : 'Opłacone w całości ✓'}
                   </div>
                 </div>
               </div>
-            </>
-          )}
         </div>
 
         <div className="flex gap-4">
