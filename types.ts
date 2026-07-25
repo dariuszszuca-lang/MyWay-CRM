@@ -244,3 +244,86 @@ export const normalizeVoivodeship = (v: string): string | null => {
   };
   return map[s] || 'Zagranica';
 };
+
+// ============================================================================
+// DZIENNIK — zamówienia Dziennika MyWay (sprzedaż przez edu-myway.pl).
+// Dane NIE leżą w bazie tego CRM. Żyją w projekcie EduWay i czytamy je przez
+// services/ordersApi.ts. Spec: klienci/myway/projekty/dziennik-panel-zamowien/SPEC.md
+// ============================================================================
+
+export type OrderStatus = 'new' | 'accepted' | 'packing' | 'shipped' | 'cancelled';
+
+// Kolejność realizacji. Marcin przestawia ręcznie.
+export const ORDER_STATUS_FLOW: OrderStatus[] = ['new', 'accepted', 'packing', 'shipped'];
+
+export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+  new: 'Zamówione',
+  accepted: 'Przyjęte do realizacji',
+  packing: 'Pakowane',
+  shipped: 'Dziennik wysłany',
+  cancelled: 'Anulowane',
+};
+
+// Statusy, po których klient dostaje maila. "Zamówione" nie wysyła,
+// bo potwierdzenie zakupu idzie automatycznie po płatności.
+export const ORDER_STATUSES_WITH_EMAIL: OrderStatus[] = ['accepted', 'packing', 'shipped'];
+
+export interface OrderShippingAddress {
+  name?: string;
+  address?: {
+    line1?: string;
+    line2?: string;
+    postal_code?: string;
+    city?: string;
+    country?: string;
+    state?: string;
+  };
+}
+
+export interface OrderStatusHistoryEntry {
+  status: OrderStatus;
+  at: string | null;   // ISO
+  by: string | null;   // mail osoby, która zmieniła
+}
+
+export interface OrderStatusEmailEntry {
+  status: OrderStatus;
+  at: string | null;   // ISO
+  ok: boolean;
+  error: string | null;
+}
+
+export interface Order {
+  id: string;                  // = ID sesji Stripe
+  customerName: string | null;
+  customerEmail: string | null;
+  customerPhone: string | null;
+  shippingAddress: OrderShippingAddress | null;
+  productName: string | null;
+  productId: string | null;
+  amount: number | null;
+  shippingCost: number;
+  currency: string;
+  orderDate: string | null;    // sformatowana data z webhooka
+  createdAt: string | null;    // ISO
+  stripeSessionId: string;
+  status: OrderStatus;
+  emailSent: boolean;          // potwierdzenie zakupu po płatności
+  statusHistory: OrderStatusHistoryEntry[];
+  statusEmails: OrderStatusEmailEntry[];
+}
+
+// Adres w kolejności czytelnej dla kuriera. Pusta tablica = brak adresu.
+export const formatOrderAddress = (shippingAddress: OrderShippingAddress | null): string[] => {
+  if (!shippingAddress) return [];
+  const a = shippingAddress.address || {};
+  const cityLine = `${a.postal_code || ''} ${a.city || ''}`.trim();
+  return [shippingAddress.name, a.line1, a.line2, cityLine, a.country].filter(Boolean) as string[];
+};
+
+// Czy ostatni mail dla AKTUALNEGO statusu się nie udał (czerwony znacznik w tabeli).
+export const hasFailedStatusEmail = (order: Order): boolean => {
+  const forStatus = order.statusEmails.filter(e => e.status === order.status);
+  if (forStatus.length === 0) return false;
+  return forStatus[forStatus.length - 1].ok === false;
+};

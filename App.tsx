@@ -8,7 +8,8 @@ import Login from './components/Login';
 import StatsDashboard from './components/StatsDashboard';
 import RoomsTab from './components/RoomsTab';
 import ReportsTab from './components/ReportsTab';
-import { Activity, Users, Download, Cloud, RefreshCw, LogOut, Clock, BarChart3, AlertTriangle, BedDouble, FileText } from 'lucide-react';
+import DziennikTab from './components/DziennikTab';
+import { Activity, Users, Download, Cloud, RefreshCw, LogOut, Clock, BarChart3, AlertTriangle, BedDouble, FileText, Package } from 'lucide-react';
 import { db, auth } from './firebaseConfig';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, getDocs, where } from 'firebase/firestore';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
@@ -16,7 +17,7 @@ import { sendWelcomeEmail, confirmPatientEmail, dischargePatientEmail } from './
 import { closeAssignment, syncAssignmentsToPatientEndDate } from './services/roomsService';
 import { canAccessApp, canAccessStats } from './services/accessControl';
 
-type ActiveTab = 'form' | 'list' | 'queue' | 'stats' | 'rooms' | 'reports';
+type ActiveTab = 'form' | 'list' | 'queue' | 'stats' | 'rooms' | 'reports' | 'dziennik';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -597,6 +598,18 @@ const App: React.FC = () => {
               </button>
 
               <button
+                onClick={() => switchTab('dziennik')}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
+                  activeTab === 'dziennik'
+                    ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <Package className="w-4 h-4" />
+                Dziennik
+              </button>
+
+              <button
                 onClick={handleLogout}
                 className="ml-2 px-3 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors flex items-center gap-1"
                 title="Wyloguj się"
@@ -758,6 +771,16 @@ const App: React.FC = () => {
             {activeTab === 'reports' && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <ReportsTab patients={patients} queue={queue} />
+              </div>
+            )}
+
+            {activeTab === 'dziennik' && (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold text-gray-800">Zamówienia Dziennika</h2>
+                  <p className="text-gray-500">Sprzedaż z edu-myway.pl. Zmiana statusu wysyła maila do klienta.</p>
+                </div>
+                <DziennikTab />
               </div>
             )}
           </>

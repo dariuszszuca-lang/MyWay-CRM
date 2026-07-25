@@ -1,0 +1,72 @@
+// Testy wpięcia zakładki "Dziennik" (zamówienia Dziennika MyWay).
+// Styl jak w tests/payment-alert.test.mjs: sprawdzamy źródła, nie renderujemy.
+// Uruchomienie: npm test
+
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
+
+const app = read('App.tsx');
+const types = read('types.ts');
+const api = read('services/ordersApi.ts');
+const tab = read('components/DziennikTab.tsx');
+const list = read('components/OrdersList.tsx');
+
+test('App.tsx ma zakładkę dziennik wpiętą we wszystkich czterech miejscach', () => {
+  assert.match(app, /import DziennikTab from '\.\/components\/DziennikTab'/, 'brak importu komponentu');
+  assert.match(app, /type ActiveTab =[^;]*'dziennik'/, "brak 'dziennik' w typie ActiveTab");
+  assert.match(app, /switchTab\('dziennik'\)/, 'brak przycisku w nawigacji');
+  assert.match(app, /activeTab === 'dziennik' &&/, 'brak renderowania treści zakładki');
+  assert.match(app, /<DziennikTab \/>/, 'komponent nie jest renderowany');
+});
+
+test('zakładka nie jest zamknięta na osobną listę dostępu (decyzja Darka: widzą wszyscy z CRM)', () => {
+  assert.doesNotMatch(app, /canAccessDziennik/, 'pojawiła się osobna kontrola dostępu, a nie było takiej decyzji');
+});
+
+test('typy statusów zgadzają się z ustaleniami', () => {
+  for (const status of ['new', 'accepted', 'packing', 'shipped', 'cancelled']) {
+    assert.match(types, new RegExp(`'${status}'`), `brak statusu ${status}`);
+  }
+  const withEmail = types.match(/ORDER_STATUSES_WITH_EMAIL[^=]*=\s*\[([^\]]*)\]/);
+  assert.ok(withEmail, 'brak listy statusów wysyłających mail');
+  assert.doesNotMatch(withEmail[1], /'new'/, 'status "Zamówione" NIE może wysyłać maila (potwierdzenie idzie po płatności)');
+  assert.doesNotMatch(withEmail[1], /'cancelled'/, 'anulowanie NIE wysyła maila');
+  for (const status of ['accepted', 'packing', 'shipped']) {
+    assert.match(withEmail[1], new RegExp(`'${status}'`), `status ${status} powinien wysyłać mail`);
+  }
+});
+
+test('zamówienia idą do funkcji w projekcie EduWay, z tokenem zalogowanego', () => {
+  assert.match(api, /europe-west1-eduway-f13c4\.cloudfunctions\.net\/ordersApi/, 'zły adres API');
+  assert.match(api, /getIdToken\(\)/, 'brak tokenu użytkownika');
+  assert.match(api, /Authorization: `Bearer \$\{token\}`/, 'token nie jest wysyłany w nagłówku');
+});
+
+test('CRM nie próbuje czytać zamówień wprost z bazy (nie ma ich w tym projekcie)', () => {
+  for (const [nazwa, zrodlo] of [['DziennikTab', tab], ['OrdersList', list], ['ordersApi', api]]) {
+    assert.doesNotMatch(zrodlo, /collection\(db,\s*'orders'\)/, `${nazwa} sięga do bazy CRM po zamówienia`);
+    assert.doesNotMatch(zrodlo, /onSnapshot/, `${nazwa} nasłuchuje bazy CRM, a zamówienia tam nie leżą`);
+  }
+});
+
+test('zmiana statusu wymaga potwierdzenia, żeby jeden klik nie wysłał maila do klienta', () => {
+  assert.match(list, /window\.confirm/, 'brak potwierdzenia przed zmianą statusu');
+  assert.match(list, /wysłać maila|wysłać maila do/i, 'potwierdzenie nie mówi, że poleci mail');
+});
+
+test('lista rozwijana jest blokowana w trakcie zapisu (ochrona przed dwuklikiem)', () => {
+  assert.match(list, /disabled=\{isBusy\}/, 'brak blokady w trakcie zapisu');
+});
+
+test('nieudany mail jest widoczny i da się go ponowić', () => {
+  assert.match(list, /Mail nie wyszedł/, 'brak informacji o nieudanym mailu');
+  assert.match(list, /onResendEmail/, 'brak możliwości ponowienia');
+  assert.match(api, /resendStatusEmail/, 'brak funkcji ponowienia w warstwie API');
+});
+
+test('brak adresu wysyłki jest oznaczony, bo bez adresu nie ma czego pakować', () => {
+  assert.match(list, /Brak adresu, dopytaj klienta/, 'brak ostrzeżenia o pustym adresie');
+});
