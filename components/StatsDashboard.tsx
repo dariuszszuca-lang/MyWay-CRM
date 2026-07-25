@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Patient, formatCurrency, getAmountDue, getAdditionalServicesTotal, normalizeVoivodeship, isInterruptedTherapy, DISCHARGE_TYPE_LABELS, SERVICE_TYPE_LABELS } from '../types';
+import { Patient, packageLabel, formatCurrency, getAmountDue, getAdditionalServicesTotal, normalizeVoivodeship, isInterruptedTherapy, DISCHARGE_TYPE_LABELS, SERVICE_TYPE_LABELS } from '../types';
 import type { AdditionalServiceType } from '../types';
 import { generateStatsPDF, StatsData } from '../services/pdfGenerator';
 import { Download, Users, Wallet, AlertTriangle, TrendingUp, Calendar, RotateCcw, UserX, Stethoscope } from 'lucide-react';
@@ -68,7 +68,10 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
   const stats = useMemo(() => {
     const active = filtered.filter(p => p.status !== 'discharged').length;
     const discharged = filtered.filter(p => p.status === 'discharged').length;
-    const totalRevenue = filtered.reduce((s, p) => s + p.totalAmount, 0);
+    // Przychód liczy pakiet PLUS usługi dodatkowe. Wcześniej brał sam pakiet, a „pozostało
+    // do zapłaty" liczyło pakiet plus usługi, więc te dwie liczby nie mogły się spiąć
+    // i skuteczność ściągania wychodziła zawyżona.
+    const totalRevenue = filtered.reduce((s, p) => s + p.totalAmount + getAdditionalServicesTotal(p), 0);
     const totalCollected = filtered.reduce((s, p) => s + p.amountPaid, 0);
     const totalOutstanding = filtered.reduce((s, p) => s + getAmountDue(p), 0);
     const unpaidCount = filtered.filter(p => getAmountDue(p) > 0).length;
@@ -88,7 +91,9 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
     // Additional services
     const allServices = filtered.flatMap(p => p.additionalServices || []);
     const totalServicesAmount = allServices.reduce((s, svc) => s + (svc.amount || 0), 0);
-    const servicesByType = (['recepta', 'psychiatra', 'kroplowka', 'inne'] as AdditionalServiceType[]).map(type => ({
+    // 'detoks' był pomijany, więc kwoty detoksów wchodziły do sumy usług, ale nie było ich
+    // widać w żadnym kaflu i liczby się nie zgadzały.
+    const servicesByType = (['recepta', 'psychiatra', 'kroplowka', 'detoks', 'inne'] as AdditionalServiceType[]).map(type => ({
       type,
       count: allServices.filter(s => s.type === type).length,
       amount: allServices.filter(s => s.type === type).reduce((s, svc) => s + (svc.amount || 0), 0),
@@ -170,7 +175,6 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
   };
 
   const pkgColors: Record<string, string> = { '1': 'teal', '2': 'blue', '3': 'purple', '6tyg': 'cyan', '8tyg': 'emerald', '6tyg_roz': 'indigo', '8tyg_roz': 'fuchsia', 'interwencyjna': 'amber', 'vip': 'rose' };
-  const pkgNames: Record<string, string> = { '1': 'Pakiet 1', '2': 'Pakiet 2', '3': 'Pakiet 3', '6tyg': '6 tygodni', '8tyg': '8 tygodni', '6tyg_roz': '6 tyg. rozszerzony', '8tyg_roz': '8 tyg. rozszerzony', 'interwencyjna': 'Terapia interwencyjna', 'vip': 'Grupa VIP' };
 
   if (patients.length === 0) {
     return (
@@ -378,7 +382,7 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
             {packages.map(p => {
               const pct = filtered.length > 0 ? (p.count / filtered.length) * 100 : 0;
               const color = pkgColors[p.pkg] || 'gray';
-              const name = pkgNames[p.pkg] || `Pakiet ${p.pkg}`;
+              const name = packageLabel(p.pkg);
               const barClass =
                 color === 'teal' ? 'bg-teal-500' :
                 color === 'blue' ? 'bg-blue-500' :

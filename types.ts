@@ -130,6 +130,33 @@ export const getAmountDue = (patient: Patient): number => {
   return patient.totalAmount + getAdditionalServicesTotal(patient) - patient.amountPaid;
 };
 
+// Pakiety terapii. JEDNO źródło nazw dla całej aplikacji.
+// Wcześniej te same etykiety były przepisane w sześciu miejscach i zdążyły się rozjechać:
+// raport przyjęć mówił „6 tyg. (rozłożony)", a reszta aplikacji „6 tyg. rozszerzony".
+export type PatientPackage = '1' | '2' | '3' | '6tyg' | '8tyg' | '6tyg_roz' | '8tyg_roz' | 'interwencyjna' | 'vip';
+
+export const PACKAGE_ORDER: PatientPackage[] = ['1', '2', '3', '6tyg', '8tyg', '6tyg_roz', '8tyg_roz', 'interwencyjna', 'vip'];
+
+export const PACKAGE_LABELS: Record<PatientPackage, string> = {
+  '1': 'Pakiet 1',
+  '2': 'Pakiet 2',
+  '3': 'Pakiet 3',
+  '6tyg': '6 tygodni',
+  '8tyg': '8 tygodni',
+  '6tyg_roz': '6 tygodni rozszerzony',
+  '8tyg_roz': '8 tygodni rozszerzony',
+  'interwencyjna': 'Terapia interwencyjna',
+  'vip': 'Grupa VIP',
+};
+
+// Krótkie etykiety do wąskich miejsc (przyciski filtrów).
+export const PACKAGE_SHORT_LABELS: Record<PatientPackage, string> = {
+  '1': '1', '2': '2', '3': '3', '6tyg': '6tyg', '8tyg': '8tyg',
+  '6tyg_roz': '6t.R', '8tyg_roz': '8t.R', 'interwencyjna': 'Interw.', 'vip': 'VIP',
+};
+
+export const packageLabel = (pkg: string): string => PACKAGE_LABELS[pkg as PatientPackage] || pkg;
+
 export const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' }).format(amount);
 };

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { QueuePatient, Room, RoomAssignment, formatCurrency, isCurrentAssignment } from '../types';
+import { QueuePatient, Room, RoomAssignment, formatCurrency, isCurrentAssignment, packageLabel } from '../types';
 import { Download } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -22,17 +22,6 @@ const formatDay = (iso: string) => {
   return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
 };
 
-const PACKAGE_LABEL: Record<string, string> = {
-  '1': 'Pakiet 1',
-  '2': 'Pakiet 2',
-  '3': 'Pakiet 3',
-  '6tyg': '6 tygodni',
-  '8tyg': '8 tygodni',
-  '6tyg_roz': '6 tyg. (rozłożony)',
-  '8tyg_roz': '8 tyg. (rozłożony)',
-  'interwencyjna': 'Interwencyjna',
-  'vip': 'VIP',
-};
 
 const AdmissionsReport: React.FC<Props> = ({ queue, rooms, assignments }) => {
   const [from, setFrom] = useState(today());
@@ -80,7 +69,7 @@ const AdmissionsReport: React.FC<Props> = ({ queue, rooms, assignments }) => {
       q.plannedArrivalTime || '—',
       `${q.firstName} ${q.lastName}`,
       q.phone || '—',
-      PACKAGE_LABEL[q.package] || q.package,
+      packageLabel(q.package) || q.package,
       q.depositAmount > 0 ? formatCurrency(q.depositAmount) : '—',
       `Pokój ${roomFor(q)}`,
       q.notes || '—',
@@ -174,7 +163,7 @@ const AdmissionsReport: React.FC<Props> = ({ queue, rooms, assignments }) => {
                   <td className="border px-2 py-2 text-center font-medium">{q.plannedArrivalTime || '—'}</td>
                   <td className="border px-2 py-2 font-medium">{q.firstName} {q.lastName}</td>
                   <td className="border px-2 py-2">{q.phone || '—'}</td>
-                  <td className="border px-2 py-2">{PACKAGE_LABEL[q.package] || q.package}</td>
+                  <td className="border px-2 py-2">{packageLabel(q.package) || q.package}</td>
                   <td className="border px-2 py-2 text-right">{q.depositAmount > 0 ? formatCurrency(q.depositAmount) : '—'}</td>
                   <td className="border px-2 py-2 text-center">{roomFor(q)}</td>
                   <td className="border px-2 py-2 text-xs text-gray-600">{q.notes || '—'}</td>

@@ -509,6 +509,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
                           <option value="recepta">Recepta</option>
                           <option value="psychiatra">Psychiatra</option>
                           <option value="kroplowka">Kroplówka</option>
+                          <option value="detoks">Detoks</option>
                           <option value="inne">Inne</option>
                         </select>
                       </div>

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Patient, formatCurrency, getAmountDue, normalizeVoivodeship, DISCHARGE_TYPE_LABELS, isInterruptedTherapy } from '../types';
+import { Patient, Payment, formatCurrency, getAmountDue, getAdditionalServicesTotal, normalizeVoivodeship, DISCHARGE_TYPE_LABELS, isInterruptedTherapy } from '../types';
 import { FileText, User, ScrollText, MessageCircle, CheckSquare, Square, Pencil, Trash2, Search, Wallet, X, CheckCircle, MapPin, Calendar, CreditCard, LogOut, Download, AlertTriangle, Clock, ArrowRight } from 'lucide-react';
 import { generateContract, generatePatientCard, generateRegulations, generateFilteredListPDF } from '../services/pdfGenerator';
 import PatientForm from './PatientForm';
@@ -51,7 +51,9 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
 
   // State for Payment Modal
   const [paymentModalPatient, setPaymentModalPatient] = useState<Patient | null>(null);
-  const [paymentAmountPaid, setPaymentAmountPaid] = useState<number>(0);
+  const [paymentAmount, setPaymentAmount] = useState<number>(0);
+  const [paymentDate, setPaymentDate] = useState<string>('');
+  const [paymentMethod, setPaymentMethod] = useState<Payment['method']>('przelew');
   const [isExportingPDF, setIsExportingPDF] = useState(false);
 
   // Get unique voivodeships from patients (normalized, foreign → "Zagranica")
@@ -137,25 +139,56 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
     setEditingPatient(null);
   };
 
-  // Payment Modal Handlers
+  // Dodawanie wpłaty z listy pacjentów.
+  // 🔴 Wcześniej ten modal zapisywał samo `amountPaid`, w oderwaniu od tablicy `payments`.
+  // Skutek: następny zapis karty pacjenta nadpisywał tę kwotę sumą z tablicy i rozliczenie
+  // znikało bez śladu. Teraz dopisujemy prawdziwą wpłatę, dokładnie tak jak robi to karta.
+
+  // Wpłaty pacjenta z uwzględnieniem starych rekordów sprzed listy wpłat
+  // (ta sama migracja co w PatientForm: pojedyncza kwota staje się jedną wpłatą).
+  const wplatyPacjenta = (patient: Patient): Payment[] => {
+    if (patient.payments && patient.payments.length > 0) return patient.payments;
+    if (patient.amountPaid > 0) {
+      return [{ amount: patient.amountPaid, date: '', method: patient.paymentMethod || 'przelew' }];
+    }
+    return [];
+  };
+
+  const pozostaloDoZaplaty = (patient: Patient): number => getAmountDue(patient);
+
   const openPaymentModal = (patient: Patient) => {
     setPaymentModalPatient(patient);
-    setPaymentAmountPaid(patient.amountPaid);
+    const pozostalo = pozostaloDoZaplaty(patient);
+    setPaymentAmount(pozostalo > 0 ? pozostalo : 0);
+    setPaymentDate(new Date().toISOString().split('T')[0]);
+    setPaymentMethod('przelew');
   };
 
   const handleSavePayment = () => {
-    if (paymentModalPatient) {
-      onUpdatePatient({
-        ...paymentModalPatient,
-        amountPaid: paymentAmountPaid
-      });
-      setPaymentModalPatient(null);
+    if (!paymentModalPatient) return;
+
+    if (!paymentAmount || paymentAmount <= 0) {
+      window.alert('Podaj kwotę wpłaty większą od zera.');
+      return;
     }
+
+    const wplaty = [
+      ...wplatyPacjenta(paymentModalPatient),
+      { amount: paymentAmount, date: paymentDate, method: paymentMethod },
+    ];
+
+    onUpdatePatient({
+      ...paymentModalPatient,
+      payments: wplaty,
+      amountPaid: wplaty.reduce((suma, w) => suma + (w.amount || 0), 0),
+    });
+    setPaymentModalPatient(null);
   };
 
   const handlePayInFull = () => {
     if (paymentModalPatient) {
-      setPaymentAmountPaid(paymentModalPatient.totalAmount);
+      const pozostalo = pozostaloDoZaplaty(paymentModalPatient);
+      setPaymentAmount(pozostalo > 0 ? pozostalo : 0);
     }
   };
 
@@ -280,56 +313,93 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-gray-900">Rozlicz Płatność</h3>
+              <h3 className="text-lg font-bold text-gray-900">Dodaj wpłatę</h3>
               <button onClick={() => setPaymentModalPatient(null)} className="text-gray-400 hover:text-gray-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="mb-6 space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Pacjent:</span>
                 <span className="font-semibold">{paymentModalPatient.firstName} {paymentModalPatient.lastName}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Całkowity koszt:</span>
-                <span className="font-bold">{formatCurrency(paymentModalPatient.totalAmount)}</span>
+                <span className="text-gray-500">Łączna należność:</span>
+                <span className="font-bold">
+                  {formatCurrency(paymentModalPatient.totalAmount + getAdditionalServicesTotal(paymentModalPatient))}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Wpłacono dotychczas:</span>
+                <span className="font-semibold">
+                  {formatCurrency(wplatyPacjenta(paymentModalPatient).reduce((s, w) => s + (w.amount || 0), 0))}
+                  <span className="text-gray-400 font-normal ml-1">
+                    ({wplatyPacjenta(paymentModalPatient).length} wpł.)
+                  </span>
+                </span>
               </div>
               <hr />
-              
+
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Wpłacona kwota (PLN)</label>
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Kwota nowej wpłaty (PLN)</label>
                 <div className="flex gap-2">
-                  <input 
-                    type="number" 
-                    value={paymentAmountPaid}
-                    onChange={(e) => setPaymentAmountPaid(Number(e.target.value))}
+                  <input
+                    type="number"
+                    value={paymentAmount || ''}
+                    onChange={(e) => setPaymentAmount(Number(e.target.value))}
                     className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none text-right font-mono text-lg bg-white text-black"
                   />
-                  <button 
+                  <button
                     onClick={handlePayInFull}
                     className="px-3 py-2 bg-teal-100 text-teal-700 rounded-lg hover:bg-teal-200 text-sm font-medium whitespace-nowrap"
+                    title="Wpisz całą pozostałą kwotę"
                   >
-                    Opłać całość
+                    Cała reszta
                   </button>
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Data wpłaty</label>
+                  <input
+                    type="date"
+                    value={paymentDate}
+                    onChange={(e) => setPaymentDate(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white text-black"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Forma</label>
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value as Payment['method'])}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white text-black"
+                  >
+                    <option value="przelew">Przelew</option>
+                    <option value="gotowka">Gotówka</option>
+                    <option value="karta">Karta</option>
+                    <option value="przedplata">Przedpłata</option>
+                  </select>
+                </div>
+              </div>
+
               <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg mt-2">
-                <span className="text-sm font-medium text-gray-600">Pozostaje do zapłaty:</span>
-                <span className={`font-mono font-bold ${paymentModalPatient.totalAmount - paymentAmountPaid > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                  {formatCurrency(paymentModalPatient.totalAmount - paymentAmountPaid)}
+                <span className="text-sm font-medium text-gray-600">Pozostanie do zapłaty:</span>
+                <span className={`font-mono font-bold ${pozostaloDoZaplaty(paymentModalPatient) - paymentAmount > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                  {formatCurrency(pozostaloDoZaplaty(paymentModalPatient) - paymentAmount)}
                 </span>
               </div>
             </div>
 
             <div className="flex gap-3">
-              <button 
+              <button
                 onClick={handleSavePayment}
                 className="flex-1 bg-teal-600 text-white py-2.5 rounded-lg font-bold hover:bg-teal-700 transition-colors flex items-center justify-center gap-2"
               >
                 <CheckCircle className="w-4 h-4" />
-                Zatwierdź
+                Dodaj wpłatę
               </button>
               <button 
                 onClick={() => setPaymentModalPatient(null)}

@@ -1,18 +1,44 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Only authenticated users can read/write
+
+    // Dostep do danych pacjentow ma WYLACZNIE zespol MyWay.
+    // Wczesniej wystarczylo byc zalogowanym czymkolwiek: kazde konto Google, ktore
+    // zalogowalo sie do tego projektu, mialo pelny odczyt i zapis kart pacjentow
+    // (PESEL, adres, dane o leczeniu, finanse). Lista dozwolonych adresow zyla tylko
+    // w kodzie strony (services/accessControl.ts), wiec byla zabezpieczeniem pozornym.
+    //
+    // 🔴 Ta lista MUSI byc zgodna z ALLOWED_EMAILS w services/accessControl.ts.
+    // Dodajesz kogos do zespolu? Zmien w OBU miejscach, inaczej interfejs go wpusci,
+    // a baza odmowi (albo odwrotnie).
+    function zespolMyWay() {
+      return [
+        'dariusz.szuca@gmail.com',
+        'krystiannagaba@gmail.com',
+        'mywaymarcin@gmail.com',
+        'npucz708@gmail.com',
+        'gabinet.osrodekmyway@gmail.com'
+      ];
+    }
+
+    function czlonekZespolu() {
+      return request.auth != null
+        && request.auth.token.email != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower() in zespolMyWay();
+    }
+
     match /patients/{patientId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if czlonekZespolu();
     }
     match /queue/{queueId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if czlonekZespolu();
     }
     match /rooms/{roomId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if czlonekZespolu();
     }
     match /roomAssignments/{assignmentId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if czlonekZespolu();
     }
   }
 }
