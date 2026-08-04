@@ -452,7 +452,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
                     </div>
                     <div className="mb-3">
                       <label className="text-xs text-gray-600 font-semibold mb-1 block">Za co</label>
-                      <input type="text" value={payment.purpose || ''} onChange={(e) => updatePayment(index, 'purpose', e.target.value)} className={inputClass} placeholder="np. kroplówka, recepta, dopłata do pakietu" />
+                      <input type="text" value={payment.purpose || ''} onChange={(e) => updatePayment(index, 'purpose', e.target.value)} className={inputClass} placeholder="opis wpłaty (opcjonalnie)" />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
@@ -514,6 +514,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
                           <option value="psychiatra">Psychiatra</option>
                           <option value="kroplowka">Kroplówka</option>
                           <option value="detoks">Detoks</option>
+                          <option value="przedluzenie">Przedłużenie terapii</option>
                           <option value="inne">Inne</option>
                         </select>
                       </div>

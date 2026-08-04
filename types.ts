@@ -57,7 +57,7 @@ export interface Payment {
   purpose?: string; // Za co wpłata (np. kroplówka, recepta, dopłata do pakietu) — opcjonalne dla zgodności wstecz
 }
 
-export type AdditionalServiceType = 'recepta' | 'psychiatra' | 'kroplowka' | 'detoks' | 'inne';
+export type AdditionalServiceType = 'recepta' | 'psychiatra' | 'kroplowka' | 'detoks' | 'przedluzenie' | 'inne';
 
 export interface AdditionalService {
   type: AdditionalServiceType;
@@ -71,6 +71,7 @@ export const SERVICE_TYPE_LABELS: Record<AdditionalServiceType, string> = {
   psychiatra: 'Psychiatra',
   kroplowka: 'Kroplówka',
   detoks: 'Detoks',
+  przedluzenie: 'Przedłużenie terapii',
   inne: 'Inne',
 };
 

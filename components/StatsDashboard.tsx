@@ -93,7 +93,7 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
     const totalServicesAmount = allServices.reduce((s, svc) => s + (svc.amount || 0), 0);
     // 'detoks' był pomijany, więc kwoty detoksów wchodziły do sumy usług, ale nie było ich
     // widać w żadnym kaflu i liczby się nie zgadzały.
-    const servicesByType = (['recepta', 'psychiatra', 'kroplowka', 'detoks', 'inne'] as AdditionalServiceType[]).map(type => ({
+    const servicesByType = (['recepta', 'psychiatra', 'kroplowka', 'detoks', 'przedluzenie', 'inne'] as AdditionalServiceType[]).map(type => ({
       type,
       count: allServices.filter(s => s.type === type).length,
       amount: allServices.filter(s => s.type === type).reduce((s, svc) => s + (svc.amount || 0), 0),
@@ -358,6 +358,7 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
                 recepta: { bg: 'bg-blue-50', text: 'text-blue-700', bar: 'bg-blue-500' },
                 psychiatra: { bg: 'bg-violet-50', text: 'text-violet-700', bar: 'bg-violet-500' },
                 kroplowka: { bg: 'bg-emerald-50', text: 'text-emerald-700', bar: 'bg-emerald-500' },
+                przedluzenie: { bg: 'bg-amber-50', text: 'text-amber-700', bar: 'bg-amber-500' },
                 inne: { bg: 'bg-gray-50', text: 'text-gray-700', bar: 'bg-gray-500' },
               };
               const c = colors[s.type] || colors.inne;

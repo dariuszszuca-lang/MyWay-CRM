@@ -368,7 +368,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                   type="text"
                   value={paymentPurpose}
                   onChange={(e) => setPaymentPurpose(e.target.value)}
-                  placeholder="np. kroplówka, recepta, dopłata do pakietu"
+                  placeholder="opis wpłaty (opcjonalnie)"
                   className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white text-black"
                 />
               </div>
