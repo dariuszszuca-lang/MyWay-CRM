@@ -54,6 +54,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
   const [paymentDate, setPaymentDate] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<Payment['method']>('przelew');
+  const [paymentPurpose, setPaymentPurpose] = useState<string>('');
   const [isExportingPDF, setIsExportingPDF] = useState(false);
 
   // Get unique voivodeships from patients (normalized, foreign → "Zagranica")
@@ -162,6 +163,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
     setPaymentAmount(pozostalo > 0 ? pozostalo : 0);
     setPaymentDate(new Date().toISOString().split('T')[0]);
     setPaymentMethod('przelew');
+    setPaymentPurpose('');
   };
 
   const handleSavePayment = () => {
@@ -174,7 +176,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
 
     const wplaty = [
       ...wplatyPacjenta(paymentModalPatient),
-      { amount: paymentAmount, date: paymentDate, method: paymentMethod },
+      { amount: paymentAmount, date: paymentDate, method: paymentMethod, purpose: paymentPurpose },
     ];
 
     onUpdatePatient({
@@ -358,6 +360,17 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                     Cała reszta
                   </button>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Za co</label>
+                <input
+                  type="text"
+                  value={paymentPurpose}
+                  onChange={(e) => setPaymentPurpose(e.target.value)}
+                  placeholder="np. kroplówka, recepta, dopłata do pakietu"
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white text-black"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">

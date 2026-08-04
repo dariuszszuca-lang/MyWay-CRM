@@ -54,6 +54,7 @@ export interface Payment {
   amount: number;
   date: string;
   method: 'przelew' | 'gotowka' | 'karta' | 'przedplata';
+  purpose?: string; // Za co wpłata (np. kroplówka, recepta, dopłata do pakietu) — opcjonalne dla zgodności wstecz
 }
 
 export type AdditionalServiceType = 'recepta' | 'psychiatra' | 'kroplowka' | 'detoks' | 'inne';

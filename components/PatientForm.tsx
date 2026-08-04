@@ -186,7 +186,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
   };
 
   const addPayment = () => {
-    setPayments(prev => [...prev, { amount: 0, date: new Date().toISOString().split('T')[0], method: 'przelew' }]);
+    setPayments(prev => [...prev, { amount: 0, date: new Date().toISOString().split('T')[0], method: 'przelew', purpose: '' }]);
   };
 
   const removePayment = (index: number) => {
@@ -449,6 +449,10 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
                       >
                         <Trash2 size={14} />
                       </button>
+                    </div>
+                    <div className="mb-3">
+                      <label className="text-xs text-gray-600 font-semibold mb-1 block">Za co</label>
+                      <input type="text" value={payment.purpose || ''} onChange={(e) => updatePayment(index, 'purpose', e.target.value)} className={inputClass} placeholder="np. kroplówka, recepta, dopłata do pakietu" />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
