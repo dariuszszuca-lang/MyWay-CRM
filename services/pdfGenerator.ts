@@ -581,6 +581,7 @@ export interface StatsData {
   totalOutstanding: number;
   collectionRate: number;
   packageBreakdown: { pkg: string; count: number; revenue: number }[];
+  averagePerPatient?: { average: number | null; count: number; excluded: string[] };
   voivodeshipBreakdown: { name: string; count: number; revenue: number }[];
   monthlyTrends: { month: string; label: string; count: number }[];
   timePeriod: string;
@@ -622,6 +623,10 @@ export const generateStatsPDF = async (stats: StatsData) => {
       ['Wpłaty', formatCurrency(stats.totalCollected)],
       ['Zaległości', formatCurrency(stats.totalOutstanding)],
       ['Ściągalność', `${stats.collectionRate.toFixed(1)}%`],
+      ...(stats.averagePerPatient ? [[
+        'Średnia na pacjenta',
+        `${stats.averagePerPatient.average !== null ? formatCurrency(stats.averagePerPatient.average) : '-'} (${stats.averagePerPatient.count} pacj., pakiet + usługi${stats.averagePerPatient.excluded.length > 0 ? `, bez: ${stats.averagePerPatient.excluded.join(', ')}` : ''})`,
+      ]] : []),
     ],
     theme: 'grid',
     styles: { font: 'Roboto', fontSize: 10, cellPadding: 3 },

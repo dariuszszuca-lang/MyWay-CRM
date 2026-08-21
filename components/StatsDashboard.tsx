@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Patient, packageLabel, formatCurrency, getAmountDue, getAdditionalServicesTotal, normalizeVoivodeship, isInterruptedTherapy, DISCHARGE_TYPE_LABELS, SERVICE_TYPE_LABELS } from '../types';
+import { averagePerPatient, DEFAULT_EXCLUDED_PACKAGES } from '../services/statsCalc';
 import type { AdditionalServiceType } from '../types';
 import { generateStatsPDF, StatsData } from '../services/pdfGenerator';
 import { Download, Users, Wallet, AlertTriangle, TrendingUp, Calendar, RotateCcw, UserX, Stethoscope } from 'lucide-react';
@@ -10,11 +11,32 @@ interface StatsDashboardProps {
 
 const MONTH_NAMES = ['Sty', 'Lut', 'Mar', 'Kwi', 'Maj', 'Cze', 'Lip', 'Sie', 'Wrz', 'Paź', 'Lis', 'Gru'];
 
+// Średnia na pacjenta: które pakiety NIE wchodzą do liczenia. Wybór zapamiętany w przeglądarce.
+const AVERAGE_EXCLUDED_KEY = 'myway-crm:stats:average-excluded-packages';
+const loadExcludedPackages = (): string[] => {
+  try {
+    const raw = window.localStorage.getItem(AVERAGE_EXCLUDED_KEY);
+    if (!raw) return DEFAULT_EXCLUDED_PACKAGES;
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : DEFAULT_EXCLUDED_PACKAGES;
+  } catch {
+    return DEFAULT_EXCLUDED_PACKAGES;
+  }
+};
+
 const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
   const [timePeriod, setTimePeriod] = useState<'all' | 'week' | 'month' | '3months' | 'year' | 'custom'>('all');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [isExporting, setIsExporting] = useState(false);
+  const [excludedPackages, setExcludedPackages] = useState<string[]>(() => loadExcludedPackages());
+  const togglePackageInAverage = (pkg: string) => {
+    setExcludedPackages(prev => {
+      const next = prev.includes(pkg) ? prev.filter(x => x !== pkg) : [...prev, pkg];
+      try { window.localStorage.setItem(AVERAGE_EXCLUDED_KEY, JSON.stringify(next)); } catch { /* tryb prywatny: wybór nie przetrwa odświeżenia */ }
+      return next;
+    });
+  };
 
   const timePeriodLabel = (period: string) => {
     switch (period) {
@@ -115,6 +137,15 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
     });
   }, [filtered]);
 
+  // Średnia na pacjenta z wybranych pakietów (pakiet + usługi dodatkowe, jak kafelek Przychód)
+  const average = useMemo(() => {
+    const included = packages.map(p => p.pkg).filter(pkg => !excludedPackages.includes(pkg));
+    const excludedLabels = packages.map(p => p.pkg).filter(pkg => excludedPackages.includes(pkg)).map(packageLabel);
+    return { ...averagePerPatient(filtered, included), excludedLabels };
+  }, [filtered, packages, excludedPackages]);
+  const averageText = average.average !== null ? formatCurrency(average.average) : '-';
+  const averageScope = `${average.count} ${average.count === 1 ? 'pacjent' : 'pacjentów'} · pakiet + usługi dodatkowe${average.excludedLabels.length > 0 ? ` · bez: ${average.excludedLabels.join(', ')}` : ''}`;
+
   // Voivodeship breakdown
   const voivodeships = useMemo(() => {
     const map = new Map<string, { count: number; revenue: number }>();
@@ -161,6 +192,7 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
         totalOutstanding: stats.totalOutstanding,
         collectionRate: stats.collectionRate,
         packageBreakdown: packages,
+        averagePerPatient: { average: average.average, count: average.count, excluded: average.excludedLabels },
         voivodeshipBreakdown: voivodeships,
         monthlyTrends: monthly,
         timePeriod: timePeriodLabel(timePeriod),
@@ -269,7 +301,8 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
           </div>
           <div className="text-2xl font-bold text-gray-900">{formatCurrency(stats.totalRevenue)}</div>
           <div className="text-xs text-gray-400 mt-1">
-            śr. na pacjenta: {filtered.length > 0 ? formatCurrency(stats.totalRevenue / filtered.length) : '-'}
+            śr. na pacjenta: {averageText}
+            {average.excludedLabels.length > 0 && <span> (bez: {average.excludedLabels.join(', ')})</span>}
           </div>
         </div>
 
@@ -401,7 +434,15 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
               return (
                 <div key={p.pkg}>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className={`text-sm font-bold ${textClass}`}>{name}</span>
+                    <label className="flex items-center gap-2 cursor-pointer" title="Wlicz do średniej na pacjenta">
+                      <input
+                        type="checkbox"
+                        checked={!excludedPackages.includes(p.pkg)}
+                        onChange={() => togglePackageInAverage(p.pkg)}
+                        className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                      />
+                      <span className={`text-sm font-bold ${textClass} ${excludedPackages.includes(p.pkg) ? 'opacity-50 line-through decoration-gray-300' : ''}`}>{name}</span>
+                    </label>
                     <span className="text-sm text-gray-500">
                       {p.count} ({pct.toFixed(0)}%) · {formatCurrency(p.revenue)}
                     </span>
@@ -415,6 +456,14 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
                 </div>
               );
             })}
+          </div>
+          <div className="mt-5 pt-4 border-t border-gray-100 flex items-center justify-between gap-4">
+            <div>
+              <div className="text-xs font-semibold text-gray-500 uppercase">Średnia na pacjenta</div>
+              <div className="text-xs text-gray-400 mt-0.5">{averageScope}</div>
+              <div className="text-[11px] text-gray-400 mt-0.5">Odznacz pakiet, żeby wyłączyć go z liczenia.</div>
+            </div>
+            <div className="text-2xl font-bold text-gray-900 whitespace-nowrap">{averageText}</div>
           </div>
         </div>
 
