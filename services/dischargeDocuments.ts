@@ -1,6 +1,6 @@
 import type jsPDF from 'jspdf';
 import { PACKAGE_LABELS, type Patient, type PatientPackage } from '../types.ts';
-import { createPdf, loadFonts, addLogo } from './pdfBase.ts';
+import { createPdf, fetchAsset, registerFont, textCenteredSpaced, type AssetLoader } from './pdfBase.ts';
 
 // Dokumenty wypisowe: dyplom, zaświadczenie o ukończeniu terapii, o pobycie, o uczestnictwie.
 // Część „dane" (kwalifikacja, odmiana, daty, nazwy plików) jest czysta i testowana w tests/.
@@ -27,12 +27,12 @@ const FILE_PREFIX: Record<DischargeDocumentKind, string> = {
 export type DocumentPatient = Pick<Patient,
   'firstName' | 'lastName' | 'pesel' | 'package' | 'treatmentStartDate' | 'treatmentEndDate' | 'status' | 'dischargeType' | 'dischargeDate'>;
 
+// Wydawca dokumentów: nowa spółka (decyzja Darka 21.08.2026). NIP/KRS do uzupełnienia, gdy Darek poda; nie zgadujemy.
 const ISSUER = {
-  company: 'Bella Vita 3City Sp. z o.o.',
+  company: 'Ośrodek MyWay Sp. z o.o.',
   brand: 'Ośrodek Leczenia Uzależnień MyWay',
   address: 'ul. Wichrowe Wzgórza 21, 84-200 Kąpino',
-  nip: 'NIP 588-242-22-71',
-  footer: 'MyWay Ośrodek Leczenia Uzależnień  ·  osrodek-myway.pl  ·  tel. 731 395 295',
+  contact: 'osrodek-myway.pl  ·  tel. 731 395 295',
 };
 
 const MONTHS_GENITIVE = ['stycznia', 'lutego', 'marca', 'kwietnia', 'maja', 'czerwca', 'lipca', 'sierpnia', 'września', 'października', 'listopada', 'grudnia'];
@@ -99,71 +99,108 @@ export const documentFileName = (kind: DischargeDocumentKind, p: Pick<DocumentPa
 
 // ---------- PDF ----------
 
-const NAVY: [number, number, number] = [27, 46, 90];   // #1B2E5A, brand MyWay
-const TEAL: [number, number, number] = [42, 157, 143];  // #2A9D8F
-const GRAY = 110;
+export interface DocumentAssets {
+  background: string;
+  logo: string;
+  fonts: { cormorantRegular: string; cormorantBold: string; montserratRegular: string; montserratBold: string };
+}
+
+export const requiredAssets = (kind: DischargeDocumentKind): DocumentAssets => ({
+  background: kind === 'dyplom' ? '/dokumenty/tlo-dyplom.jpg' : '/dokumenty/tlo-zaswiadczenie.jpg',
+  logo: '/dokumenty/logo-myway.png',
+  fonts: {
+    cormorantRegular: '/dokumenty/fonts/CormorantGaramond-Medium.ttf',
+    cormorantBold: '/dokumenty/fonts/CormorantGaramond-SemiBold.ttf',
+    montserratRegular: '/dokumenty/fonts/Montserrat-Regular.ttf',
+    montserratBold: '/dokumenty/fonts/Montserrat-SemiBold.ttf',
+  },
+});
+
+const NAVY: [number, number, number] = [27, 46, 90];    // #1B2E5A
+const TEAL: [number, number, number] = [42, 157, 143];   // #2A9D8F
+const INK: [number, number, number] = [38, 44, 58];
+const MUTED: [number, number, number] = [112, 118, 130];
+const LOGO_RATIO = 345 / 1196; // proporcje logo poziomego
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
-// Zaświadczenie A4 pionowo: nagłówek wydawcy, tytuł, nazwisko, treść, podpis
-const drawCertificate = async (title: string, subtitle: string, body: string[], d: DocumentData): Promise<jsPDF> => {
-  const doc = createPdf();
-  await loadFonts(doc);
-  addLogo(doc);
+type Prepared = { doc: jsPDF; logo: Uint8Array; w: number; h: number };
 
-  doc.setFont('Roboto', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(GRAY);
-  doc.text([ISSUER.company, ISSUER.brand, ISSUER.address, ISSUER.nip], 20, 14);
-  doc.text(`Kąpino, dnia ${d.issuedOn}`, 190, 34, { align: 'right' });
+const prepare = async (kind: DischargeDocumentKind, loadAsset: AssetLoader): Promise<Prepared> => {
+  const assets = requiredAssets(kind);
+  const landscape = kind === 'dyplom';
+  const doc = createPdf({ orientation: landscape ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
+  const [background, logo] = await Promise.all([
+    loadAsset(assets.background),
+    loadAsset(assets.logo),
+    registerFont(doc, loadAsset, assets.fonts.cormorantRegular, 'Cormorant', 'normal'),
+    registerFont(doc, loadAsset, assets.fonts.cormorantBold, 'Cormorant', 'bold'),
+    registerFont(doc, loadAsset, assets.fonts.montserratRegular, 'Montserrat', 'normal'),
+    registerFont(doc, loadAsset, assets.fonts.montserratBold, 'Montserrat', 'bold'),
+  ]);
+  const w = landscape ? 297 : 210;
+  const h = landscape ? 210 : 297;
+  doc.addImage(new Uint8Array(background), 'JPEG', 0, 0, w, h);
+  return { doc, logo: new Uint8Array(logo), w, h };
+};
 
-  doc.setTextColor(...NAVY);
-  doc.setFont('Roboto', 'bold');
-  doc.setFontSize(20);
-  doc.text(title, 105, 70, { align: 'center' });
-  doc.setFont('Roboto', 'normal');
-  doc.setFontSize(11);
-  doc.setTextColor(GRAY);
-  doc.text(subtitle, 105, 78, { align: 'center' });
+const font = (doc: jsPDF, family: 'Cormorant' | 'Montserrat', style: 'normal' | 'bold', size: number, color: [number, number, number]) => {
+  doc.setFont(family, style);
+  doc.setFontSize(size);
+  doc.setTextColor(...color);
+};
 
-  doc.setTextColor(0);
-  doc.setFontSize(12);
-  doc.text('Zaświadcza się, że', 105, 98, { align: 'center' });
-  doc.setFont('Roboto', 'bold');
-  doc.setFontSize(16);
-  doc.text(`${d.salutation} ${d.fullName}`, 105, 108, { align: 'center' });
-  doc.setFont('Roboto', 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(GRAY);
-  doc.text(`PESEL ${d.pesel}`, 105, 115, { align: 'center' });
+const signature = (doc: jsPDF, x1: number, x2: number, y: number) => {
+  doc.setDrawColor(...NAVY);
+  doc.setLineWidth(0.3);
+  doc.line(x1, y, x2, y);
+  font(doc, 'Montserrat', 'normal', 8, MUTED);
+  doc.text('podpis i pieczęć Ośrodka', (x1 + x2) / 2, y + 5, { align: 'center' });
+};
 
-  doc.setTextColor(0);
-  doc.setFontSize(12);
-  let y = 130;
-  for (const paragraph of body) {
-    const lines = doc.splitTextToSize(paragraph, 160) as string[];
-    doc.text(lines, 25, y);
-    y += lines.length * 6.5 + 5;
-  }
+// Zaświadczenie A4 pionowo
+const drawCertificate = async (kind: Exclude<DischargeDocumentKind, 'dyplom'>, subtitle: string, body: string[], d: DocumentData, loadAsset: AssetLoader): Promise<jsPDF> => {
+  const { doc, logo } = await prepare(kind, loadAsset);
+  const logoW = 46;
+  doc.addImage(logo, 'PNG', 110 - logoW / 2, 16, logoW, logoW * LOGO_RATIO);
+  font(doc, 'Montserrat', 'bold', 8, NAVY);
+  textCenteredSpaced(doc, ISSUER.company.toUpperCase(), 110, 38, 1.2);
 
-  doc.setFontSize(10);
-  doc.setTextColor(GRAY);
-  doc.text('Zaświadczenie wydaje się na prośbę osoby zainteresowanej, celem przedłożenia według potrzeb.', 25, y + 6, { maxWidth: 160 });
-
-  doc.setDrawColor(120);
-  doc.line(120, 232, 190, 232);
-  doc.setFontSize(9);
-  doc.text('podpis i pieczęć Ośrodka', 155, 237, { align: 'center' });
-
+  font(doc, 'Cormorant', 'bold', 34, NAVY);
+  textCenteredSpaced(doc, 'ZAŚWIADCZENIE', 105, 78, 2);
+  font(doc, 'Montserrat', 'bold', 9.5, TEAL);
+  textCenteredSpaced(doc, subtitle.toUpperCase(), 105, 87, 2.5);
   doc.setDrawColor(...TEAL);
-  doc.setLineWidth(0.6);
-  doc.line(20, 278, 190, 278);
-  doc.setFontSize(8);
-  doc.text(ISSUER.footer, 105, 284, { align: 'center' });
+  doc.setLineWidth(0.4);
+  doc.line(90, 93, 120, 93);
+
+  font(doc, 'Cormorant', 'normal', 14, MUTED);
+  doc.text('Zaświadcza się, że', 105, 108, { align: 'center' });
+  font(doc, 'Cormorant', 'bold', 24, NAVY);
+  doc.text(`${d.salutation} ${d.fullName}`, 105, 120, { align: 'center' });
+  font(doc, 'Montserrat', 'normal', 9, MUTED);
+  doc.text(`PESEL ${d.pesel}`, 105, 127, { align: 'center' });
+
+  font(doc, 'Cormorant', 'normal', 13.5, INK);
+  let y = 142;
+  for (const paragraph of body) {
+    const lines = doc.splitTextToSize(paragraph, 150) as string[];
+    doc.text(lines, 30, y, { lineHeightFactor: 1.35 });
+    y += lines.length * 13.5 * 0.3528 * 1.35 + 5;
+  }
+  font(doc, 'Montserrat', 'normal', 8.5, MUTED);
+  doc.text('Zaświadczenie wydaje się na prośbę osoby zainteresowanej, celem przedłożenia według potrzeb.', 30, y + 6, { maxWidth: 150 });
+
+  font(doc, 'Montserrat', 'normal', 9, MUTED);
+  doc.text(`Kąpino, dnia ${d.issuedOn}`, 180, 221, { align: 'right' });
+  signature(doc, 112, 180, 232);
+
+  font(doc, 'Montserrat', 'normal', 8, MUTED);
+  doc.text(`${ISSUER.company}  ·  ${ISSUER.address}`, 105, 258, { align: 'center' });
+  doc.text(ISSUER.contact, 105, 263, { align: 'center' });
   return doc;
 };
 
-// miejscownik: w Ośrodku, nie w Ośrodek
 const stayPlace = `w Ośrodku Leczenia Uzależnień MyWay w Kąpinie (${ISSUER.address}), prowadzonym przez ${ISSUER.company}`;
 
 const certificateBody = (kind: Exclude<DischargeDocumentKind, 'dyplom'>, d: DocumentData): string[] => {
@@ -184,73 +221,53 @@ const certificateBody = (kind: Exclude<DischargeDocumentKind, 'dyplom'>, d: Docu
   }
 };
 
-// Dyplom A4 poziomo, kierunek „MyWay granat": pasek granatowy z marką, nazwisko w teal, jedno zdanie, podpis
-const drawDiploma = async (d: DocumentData): Promise<jsPDF> => {
-  const doc = createPdf({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-  await loadFonts(doc);
+// Dyplom A4 poziomo: tło premium, logo na górze, nazwisko jako bohater, cytat MyWay, podpis
+const drawDiploma = async (d: DocumentData, loadAsset: AssetLoader): Promise<jsPDF> => {
+  const { doc, logo } = await prepare('dyplom', loadAsset);
+  const logoW = 58;
+  doc.addImage(logo, 'PNG', 148.5 - logoW / 2, 16, logoW, logoW * LOGO_RATIO);
+  font(doc, 'Montserrat', 'bold', 8, NAVY);
+  textCenteredSpaced(doc, ISSUER.company.toUpperCase(), 148.5, 41, 1.2);
+  font(doc, 'Montserrat', 'normal', 8, MUTED);
+  doc.text(ISSUER.address, 148.5, 46, { align: 'center' });
 
-  doc.setFillColor(...NAVY);
-  doc.rect(0, 0, 297, 40, 'F');
-  doc.setFillColor(...TEAL);
-  doc.rect(0, 40, 297, 2, 'F');
-  doc.setTextColor(255);
-  doc.setFont('Roboto', 'bold');
-  doc.setFontSize(28);
-  doc.text('MyWay', 22, 24);
-  doc.setFont('Roboto', 'normal');
-  doc.setFontSize(9);
-  doc.text('OŚRODEK LECZENIA UZALEŻNIEŃ  ·  KĄPINO', 22, 32);
+  font(doc, 'Cormorant', 'bold', 52, NAVY);
+  textCenteredSpaced(doc, 'DYPLOM', 148.5, 72, 4);
+  font(doc, 'Montserrat', 'bold', 10, TEAL);
+  textCenteredSpaced(doc, 'UKOŃCZENIA PROGRAMU TERAPII', 148.5, 82, 3);
+  doc.setDrawColor(...TEAL);
+  doc.setLineWidth(0.4);
+  doc.line(128.5, 88, 168.5, 88);
 
-  doc.setTextColor(...NAVY);
-  doc.setFont('Roboto', 'bold');
-  doc.setFontSize(36);
-  doc.text('DYPLOM', 148.5, 75, { align: 'center' });
-  doc.setFont('Roboto', 'normal');
-  doc.setFontSize(12);
-  doc.setTextColor(GRAY);
-  doc.text('ukończenia programu terapii', 148.5, 84, { align: 'center' });
-
-  doc.setTextColor(...TEAL);
-  doc.setFont('Roboto', 'bold');
-  doc.setFontSize(30);
+  font(doc, 'Cormorant', 'bold', 40, TEAL);
   doc.text(d.fullName, 148.5, 110, { align: 'center' });
+  font(doc, 'Cormorant', 'normal', 16, INK);
+  doc.text(`${d.verbs.completed} program terapii uzależnień w Ośrodku MyWay w Kąpinie`, 148.5, 124, { align: 'center' });
+  font(doc, 'Montserrat', 'normal', 10.5, MUTED);
+  doc.text(`w okresie od ${d.stayFrom} do ${d.stayTo}`, 148.5, 133, { align: 'center' });
 
-  doc.setTextColor(0);
-  doc.setFont('Roboto', 'normal');
-  doc.setFontSize(13);
-  doc.text(`${d.verbs.completed} program terapii uzależnień w Ośrodku MyWay w Kąpinie`, 148.5, 126, { align: 'center' });
-  doc.setFontSize(12);
-  doc.setTextColor(GRAY);
-  doc.text(`w okresie od ${d.stayFrom} do ${d.stayTo}`, 148.5, 135, { align: 'center' });
+  font(doc, 'Cormorant', 'normal', 15, NAVY);
+  doc.text('„Trzeźwość to nie koniec drogi. To jej początek.”', 148.5, 152, { align: 'center' });
 
-  doc.setTextColor(...NAVY);
-  doc.setFontSize(12);
-  doc.text('„Trzeźwość to nie koniec drogi. To jej początek.”', 148.5, 156, { align: 'center' });
-
-  doc.setTextColor(GRAY);
-  doc.setFontSize(10);
-  doc.text(`Kąpino, ${d.issuedOn}`, 22, 186);
-  doc.setDrawColor(120);
-  doc.line(200, 184, 275, 184);
-  doc.setFontSize(9);
-  doc.text('podpis i pieczęć Ośrodka', 237.5, 189, { align: 'center' });
-
-  doc.setFillColor(...NAVY);
-  doc.rect(0, 204, 297, 6, 'F');
+  // dolny pas tła to mglisty las: data na środku nad mgłą, podpis po prawej, nic w lewym dolnym rogu
+  font(doc, 'Montserrat', 'normal', 9.5, INK);
+  doc.text(`Kąpino, ${d.issuedOn}`, 148.5, 167, { align: 'center' });
+  signature(doc, 150, 218, 183);
   return doc;
 };
 
 export const generateDischargeDocument = async (
   kind: DischargeDocumentKind,
   patient: DocumentPatient,
-  options: { today?: string } = {},
+  options: { today?: string; loadAsset?: AssetLoader } = {},
 ): Promise<jsPDF> => {
   const d = buildDocumentData(patient, options.today || todayIso());
-  if (kind === 'dyplom') return drawDiploma(d);
-  const titles: Record<Exclude<DischargeDocumentKind, 'dyplom'>, string> = {
+  const loadAsset = options.loadAsset || fetchAsset;
+  if (kind === 'dyplom') return drawDiploma(d, loadAsset);
+  const subtitles: Record<Exclude<DischargeDocumentKind, 'dyplom'>, string> = {
     ukonczenie: 'o ukończeniu terapii',
     pobyt: 'o pobycie w ośrodku',
     uczestnictwo: 'o uczestnictwie w terapii',
   };
-  return drawCertificate('ZAŚWIADCZENIE', titles[kind], certificateBody(kind, d), d);
+  return drawCertificate(kind, subtitles[kind], certificateBody(kind, d), d, loadAsset);
 };

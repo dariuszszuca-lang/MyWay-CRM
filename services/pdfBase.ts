@@ -17,6 +17,28 @@ const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
   return btoa(binary); // globalne btoa: przeglądarka i Node 16+
 };
 
+// Zasoby dokumentów (fonty, tła, logo) leżą w public/dokumenty i są serwowane z korzenia aplikacji.
+// Loader jest wstrzykiwany, żeby narzędzia w tools/ mogły czytać te same pliki z dysku w Node.
+export type AssetLoader = (path: string) => Promise<ArrayBuffer>;
+
+export const fetchAsset: AssetLoader = async (path) => {
+  const response = await fetch(path);
+  if (!response.ok) throw new Error(`Brak zasobu ${path} (HTTP ${response.status})`);
+  return response.arrayBuffer();
+};
+
+export const registerFont = async (doc: jsPDF, loadAsset: AssetLoader, path: string, family: string, style: 'normal' | 'bold') => {
+  const file = path.split('/').pop() || path;
+  doc.addFileToVFS(file, arrayBufferToBase64(await loadAsset(path)));
+  doc.addFont(file, family, style);
+};
+
+// Wyśrodkowany tekst z rozstrzeleniem liter (jsPDF nie uwzględnia charSpace przy align: center)
+export const textCenteredSpaced = (doc: jsPDF, text: string, centerX: number, y: number, charSpace: number) => {
+  const width = doc.getTextWidth(text) + charSpace * Math.max(text.length - 1, 0);
+  doc.text(text, centerX - width / 2, y, { charSpace });
+};
+
 // W przeglądarce (Vite) domyślny eksport jspdf to klasa; w Node (CommonJS) to obiekt modułu z polem jsPDF.
 export const createPdf = (options?: jsPDFOptions): jsPDF => {
   const Ctor = ((jsPDF as unknown as { jsPDF?: typeof jsPDF }).jsPDF ?? jsPDF) as typeof jsPDF;
