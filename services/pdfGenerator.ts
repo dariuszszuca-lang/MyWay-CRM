@@ -1,42 +1,10 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Patient, getAmountDue, formatCurrency, normalizeVoivodeship } from '../types';
+import { loadFonts, addLogo } from './pdfBase';
 
-// URLs for fonts that support Polish characters (Roboto)
-const FONT_URL_REGULAR = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf';
-const FONT_URL_BOLD = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Medium.ttf';
-
-// Helper function to convert ArrayBuffer to Base64
-const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
-  let binary = '';
-  const bytes = new Uint8Array(buffer);
-  const len = bytes.byteLength;
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return window.btoa(binary);
-};
-
-// Helper to load fonts
-export const loadFonts = async (doc: jsPDF) => {
-  try {
-    const regularResponse = await fetch(FONT_URL_REGULAR);
-    const regularBlob = await regularResponse.arrayBuffer();
-    doc.addFileToVFS('Roboto-Regular.ttf', arrayBufferToBase64(regularBlob));
-    doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
-
-    const boldResponse = await fetch(FONT_URL_BOLD);
-    const boldBlob = await boldResponse.arrayBuffer();
-    doc.addFileToVFS('Roboto-Bold.ttf', arrayBufferToBase64(boldBlob));
-    doc.addFont('Roboto-Bold.ttf', 'Roboto', 'bold');
-
-    doc.setFont('Roboto');
-    return true;
-  } catch (error) {
-    console.error("Error loading fonts", error);
-    return false;
-  }
-};
+// Re-eksport dla komponentów, które importują loadFonts stąd (DischargesReport)
+export { loadFonts };
 
 // Helper to add footer with page number
 const addPageNumbers = (doc: jsPDF) => {
@@ -48,17 +16,6 @@ const addPageNumbers = (doc: jsPDF) => {
   }
 };
 
-// Helper to add standard header
-const addLogo = (doc: jsPDF) => {
-  doc.setFontSize(18);
-  doc.setTextColor(13, 148, 136); // Teal-600
-  doc.setFont("Roboto", "bold");
-  doc.text("MyWay", 170, 15, { align: 'right' });
-  doc.setFontSize(8);
-  doc.setTextColor(100);
-  doc.text("OŚRODEK LECZENIA UZALEŻNIEŃ", 170, 20, { align: 'right' });
-  doc.setTextColor(0);
-};
 
 export const generatePatientCard = async (patient: Patient) => {
   const doc = new jsPDF();

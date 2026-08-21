@@ -3,6 +3,7 @@ import { Patient, Payment, formatCurrency, getAmountDue, getAdditionalServicesTo
 import { FileText, User, ScrollText, MessageCircle, CheckSquare, Square, Pencil, Trash2, Search, Wallet, X, CheckCircle, MapPin, Calendar, CreditCard, LogOut, Download, AlertTriangle, Clock, ArrowRight, Eye } from 'lucide-react';
 import { generateContract, generatePatientCard, generateRegulations, generateFilteredListPDF } from '../services/pdfGenerator';
 import PatientForm from './PatientForm';
+import DischargeDocuments from './DischargeDocuments';
 
 interface DischargeData {
   dischargeType: 'completed' | 'resignation' | 'referral' | 'conditional_break' | 'expelled';
@@ -675,6 +676,8 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
               </ul>
             </div>
 
+            {dischargeEditMode && <DischargeDocuments patient={dischargeModalPatient} />}
+
             <div className="flex gap-3">
               {(() => {
                 const amountDue = getAmountDue(dischargeModalPatient);
@@ -1131,6 +1134,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                       <User className="w-3 h-3" />
                       Karta
                     </button>
+                    <DischargeDocuments patient={patient} compact />
                     {patient.status !== 'discharged' && (
                       <button
                         onClick={() => openDischargeModal(patient)}
