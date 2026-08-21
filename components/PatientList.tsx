@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Patient, Payment, formatCurrency, getAmountDue, getAdditionalServicesTotal, normalizeVoivodeship, DISCHARGE_TYPE_LABELS, isInterruptedTherapy } from '../types';
-import { FileText, User, ScrollText, MessageCircle, CheckSquare, Square, Pencil, Trash2, Search, Wallet, X, CheckCircle, MapPin, Calendar, CreditCard, LogOut, Download, AlertTriangle, Clock, ArrowRight } from 'lucide-react';
+import { FileText, User, ScrollText, MessageCircle, CheckSquare, Square, Pencil, Trash2, Search, Wallet, X, CheckCircle, MapPin, Calendar, CreditCard, LogOut, Download, AlertTriangle, Clock, ArrowRight, Eye } from 'lucide-react';
 import { generateContract, generatePatientCard, generateRegulations, generateFilteredListPDF } from '../services/pdfGenerator';
 import PatientForm from './PatientForm';
 
@@ -21,9 +21,10 @@ interface PatientListProps {
   onDeletePatient: (id: string) => void;
   onDischargePatient: (patient: Patient, dischargeData: DischargeData) => void;
   onReactivatePatient: (patient: Patient) => void;
+  onUpdateDischarge: (patient: Patient, dischargeData: DischargeData) => void;
 }
 
-const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, onDeletePatient, onDischargePatient, onReactivatePatient }) => {
+const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, onDeletePatient, onDischargePatient, onReactivatePatient, onUpdateDischarge }) => {
   const [filterPackage, setFilterPackage] = useState<'all' | '1' | '2' | '3' | '6tyg' | '8tyg' | '6tyg_roz' | '8tyg_roz' | 'interwencyjna' | 'vip'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'discharged' | 'interrupted'>('active');
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
@@ -31,6 +32,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
 
   // Discharge modal state
   const [dischargeModalPatient, setDischargeModalPatient] = useState<Patient | null>(null);
+  const [dischargeEditMode, setDischargeEditMode] = useState(false); // true = podgląd/zmiana zapisanego wypisu
   const [dischargeType, setDischargeType] = useState<DischargeData['dischargeType']>('completed');
   const [dischargeDate, setDischargeDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [dischargeRefundAmount, setDischargeRefundAmount] = useState<number>(0);
@@ -231,6 +233,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
   // Discharge modal handlers
   const openDischargeModal = (patient: Patient) => {
     setDischargeModalPatient(patient);
+    setDischargeEditMode(false);
     setDischargeType('completed');
     setDischargeDate(new Date().toISOString().split('T')[0]);
     setDischargeRefundAmount(0);
@@ -242,8 +245,25 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
     setAuthorizedNote('');
   };
 
+  // Podgląd i zmiana zapisanego wypisu: ten sam modal, wypełniony danymi z bazy.
+  // Zapis zmienia tylko pola wypisu (bez statusu, pokoju i maila pożegnalnego).
+  const openDischargeEditModal = (patient: Patient) => {
+    setDischargeModalPatient(patient);
+    setDischargeEditMode(true);
+    setDischargeType(patient.dischargeType || 'completed');
+    setDischargeDate(patient.dischargeDate || new Date().toISOString().split('T')[0]);
+    setDischargeRefundAmount(patient.refundAmount || 0);
+    setDischargeRefundDate(patient.refundDate || '');
+    setDischargeConditionalReturnDate(patient.conditionalReturnDate || '');
+    setDischargeNotes(patient.dischargeNotes || '');
+    setOverrideDebt(false);
+    setAuthorizedBy('');
+    setAuthorizedNote('');
+  };
+
   const closeDischargeModal = () => {
     setDischargeModalPatient(null);
+    setDischargeEditMode(false);
   };
 
   const handleConfirmDischarge = () => {
@@ -251,7 +271,9 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
 
     // Walidacja: blokada wypisu typu "completed" przy niezapłaconej całości
     const amountDue = getAmountDue(dischargeModalPatient);
-    if (dischargeType === 'completed' && amountDue > 0) {
+    // Blokada długu tylko przy pierwszym wypisie. Przy zmianie zapisanego wypisu status
+    // i autoryzacja nie zmieniają się, więc nie ma czego ponownie autoryzować.
+    if (!dischargeEditMode && dischargeType === 'completed' && amountDue > 0) {
       if (!overrideDebt) {
         alert(`Nie można zakończyć terapii. Pacjent ma do zapłaty ${formatCurrency(amountDue)}.\n\nJeśli chcesz wypisać mimo zadłużenia, zaznacz opcję "Wypis mimo zadłużenia" i wybierz osobę autoryzującą.`);
         return;
@@ -276,14 +298,18 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
     if (dischargeNotes.trim()) {
       data.dischargeNotes = dischargeNotes.trim();
     }
-    if (dischargeType === 'completed' && amountDue > 0 && overrideDebt && authorizedBy) {
+    if (!dischargeEditMode && dischargeType === 'completed' && amountDue > 0 && overrideDebt && authorizedBy) {
       data.authorizedBy = authorizedBy as 'Natalia' | 'Krystian';
       if (authorizedNote.trim()) {
         data.authorizedNote = authorizedNote.trim();
       }
     }
 
-    onDischargePatient(dischargeModalPatient, data);
+    if (dischargeEditMode) {
+      onUpdateDischarge(dischargeModalPatient, data);
+    } else {
+      onDischargePatient(dischargeModalPatient, data);
+    }
     closeDischargeModal();
   };
 
@@ -430,7 +456,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 my-8 animate-in fade-in zoom-in duration-200">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-gray-900">Wypis pacjenta</h3>
+              <h3 className="text-lg font-bold text-gray-900">{dischargeEditMode ? 'Wypis: podgląd i zmiana' : 'Wypis pacjenta'}</h3>
               <button onClick={closeDischargeModal} className="text-gray-400 hover:text-gray-600">
                 <X className="w-5 h-5" />
               </button>
@@ -439,6 +465,11 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
             <div className="mb-4 p-3 bg-gray-50 rounded-lg">
               <span className="text-sm text-gray-500">Pacjent:</span>
               <span className="ml-2 font-bold text-gray-900">{dischargeModalPatient.firstName} {dischargeModalPatient.lastName}</span>
+              {dischargeEditMode && (
+                <div className="mt-1 text-xs text-gray-500">
+                  Zmieniasz zapisany wypis z {dischargeModalPatient.dischargeDate || '?'}. Mail pożegnalny nie zostanie wysłany ponownie.
+                </div>
+              )}
             </div>
 
             {/* Discharge type selection */}
@@ -572,7 +603,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                     <div><span className="text-gray-500">Wpłacono:</span><br/><strong>{formatCurrency(dischargeModalPatient.amountPaid)}</strong></div>
                     <div><span className="text-gray-500">Do zapłaty:</span><br/><strong className={isDebt ? 'text-red-600' : 'text-green-600'}>{formatCurrency(amountDue)}</strong></div>
                   </div>
-                  {isDebt && isCompleted && (
+                  {isDebt && isCompleted && !dischargeEditMode && (
                     <div className="mt-3 pt-3 border-t border-red-300">
                       <div className="text-xs text-red-700 font-semibold mb-2">
                         ⚠️ Nie można zakończyć terapii z niezapłaconą kwotą.
@@ -626,11 +657,13 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
             <div className="p-3 bg-gray-50 rounded-lg mb-4 text-sm text-gray-700">
               <div className="font-semibold mb-1">Podsumowanie:</div>
               <ul className="space-y-1 text-xs">
-                <li>Status pacjenta zmieni się na <strong>nieaktywny</strong></li>
+                {dischargeEditMode
+                  ? <li>Status pacjenta pozostaje <strong>wypisany</strong>. Zmieniasz tylko powód, daty, zwrot i uwagi.</li>
+                  : <li>Status pacjenta zmieni się na <strong>nieaktywny</strong></li>}
                 {dischargeType !== 'completed' && (
                   <li>Raportowany jako <strong className="text-orange-600">przerwana terapia</strong></li>
                 )}
-                {dischargeType === 'completed' && (
+                {dischargeType === 'completed' && !dischargeEditMode && (
                   <li>Zostanie wysłany <strong className="text-green-600">mail pożegnalny</strong></li>
                 )}
                 {(dischargeType === 'resignation' || dischargeType === 'referral') && dischargeRefundAmount > 0 && (
@@ -645,7 +678,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
             <div className="flex gap-3">
               {(() => {
                 const amountDue = getAmountDue(dischargeModalPatient);
-                const blockedByDebt = dischargeType === 'completed' && amountDue > 0 && (!overrideDebt || !authorizedBy);
+                const blockedByDebt = !dischargeEditMode && dischargeType === 'completed' && amountDue > 0 && (!overrideDebt || !authorizedBy);
                 const blockedByExpelled = dischargeType === 'expelled' && !dischargeNotes.trim();
                 const isBlocked = blockedByDebt || blockedByExpelled;
                 return (
@@ -655,8 +688,8 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                     className="flex-1 bg-purple-600 text-white py-2.5 rounded-lg font-bold hover:bg-purple-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     title={blockedByDebt ? `Do zapłaty: ${formatCurrency(amountDue)}` : ''}
                   >
-                    <LogOut className="w-4 h-4" />
-                    Wypisz pacjenta
+                    {dischargeEditMode ? <Pencil className="w-4 h-4" /> : <LogOut className="w-4 h-4" />}
+                    {dischargeEditMode ? 'Zapisz zmiany' : 'Wypisz pacjenta'}
                   </button>
                 );
               })()}
@@ -1106,6 +1139,16 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                       >
                         <LogOut className="w-3 h-3" />
                         Wypisz
+                      </button>
+                    )}
+                    {patient.status === 'discharged' && (
+                      <button
+                        onClick={() => openDischargeEditModal(patient)}
+                        className="w-full justify-center inline-flex items-center gap-1 px-3 py-1.5 border border-purple-400 text-purple-600 rounded hover:bg-purple-50 text-xs font-medium transition-colors"
+                        title="Podgląd i zmiana wypisu: powód, daty, zwrot, uwagi"
+                      >
+                        <Eye className="w-3 h-3" />
+                        Wypis
                       </button>
                     )}
                     {patient.status === 'discharged' && (

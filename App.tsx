@@ -15,6 +15,7 @@ import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, order
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { sendWelcomeEmail, confirmPatientEmail, dischargePatientEmail } from './services/getResponseService';
 import { closeAssignment, syncAssignmentsToPatientEndDate } from './services/roomsService';
+import { buildDischargeUpdatePayload, DischargeUpdateInput } from './services/dischargeUpdate';
 import { canAccessApp, canAccessStats } from './services/accessControl';
 
 type ActiveTab = 'form' | 'list' | 'queue' | 'stats' | 'rooms' | 'reports' | 'dziennik';
@@ -409,6 +410,18 @@ const App: React.FC = () => {
     }
   };
 
+  // Zmiana zapisanego wypisu: tylko powód, daty, zwrot i uwagi. Bez zmiany statusu,
+  // bez ponownego zwalniania pokoju i bez ponownego maila pożegnalnego.
+  const handleUpdateDischarge = async (patient: Patient, dischargeData: DischargeUpdateInput) => {
+    try {
+      await updateDoc(doc(db, "patients", patient.id), buildDischargeUpdatePayload(dischargeData));
+      alert(`✅ Wypis ${patient.firstName} ${patient.lastName} zaktualizowany.`);
+    } catch (err) {
+      alert("Błąd podczas zapisu zmian wypisu.");
+      console.error(err);
+    }
+  };
+
   // Reactivate patient (e.g. return from conditional break)
   const handleReactivatePatient = async (patient: Patient) => {
     if (!window.confirm(`Czy na pewno chcesz przywrócić ${patient.firstName} ${patient.lastName} do aktywnych pacjentów?`)) {
@@ -728,6 +741,7 @@ const App: React.FC = () => {
                   onDeletePatient={handleDeletePatient}
                   onDischargePatient={handleDischargePatient}
                   onReactivatePatient={handleReactivatePatient}
+                  onUpdateDischarge={handleUpdateDischarge}
                 />
               </div>
             )}
