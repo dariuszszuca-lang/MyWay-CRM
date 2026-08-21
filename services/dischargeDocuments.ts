@@ -1,6 +1,7 @@
 import type jsPDF from 'jspdf';
 import { PACKAGE_LABELS, type Patient, type PatientPackage } from '../types.ts';
 import { createPdf, fetchAsset, registerFont, textCenteredSpaced, type AssetLoader } from './pdfBase.ts';
+import { ISSUER } from './issuer.ts';
 
 // Dokumenty wypisowe: dyplom, zaświadczenie o ukończeniu terapii, o pobycie, o uczestnictwie.
 // Część „dane" (kwalifikacja, odmiana, daty, nazwy plików) jest czysta i testowana w tests/.
@@ -27,13 +28,6 @@ const FILE_PREFIX: Record<DischargeDocumentKind, string> = {
 export type DocumentPatient = Pick<Patient,
   'firstName' | 'lastName' | 'pesel' | 'package' | 'treatmentStartDate' | 'treatmentEndDate' | 'status' | 'dischargeType' | 'dischargeDate'>;
 
-// Wydawca dokumentów: nowa spółka (decyzja Darka 21.08.2026). NIP/KRS do uzupełnienia, gdy Darek poda; nie zgadujemy.
-const ISSUER = {
-  company: 'Ośrodek MyWay Sp. z o.o.',
-  brand: 'Ośrodek Leczenia Uzależnień MyWay',
-  address: 'ul. Wichrowe Wzgórza 21, 84-200 Kąpino',
-  contact: 'osrodek-myway.pl  ·  tel. 731 395 295',
-};
 
 const MONTHS_GENITIVE = ['stycznia', 'lutego', 'marca', 'kwietnia', 'maja', 'czerwca', 'lipca', 'sierpnia', 'września', 'października', 'listopada', 'grudnia'];
 
@@ -164,7 +158,7 @@ const drawCertificate = async (kind: Exclude<DischargeDocumentKind, 'dyplom'>, s
   const logoW = 46;
   doc.addImage(logo, 'PNG', 110 - logoW / 2, 16, logoW, logoW * LOGO_RATIO);
   font(doc, 'Montserrat', 'bold', 8, NAVY);
-  textCenteredSpaced(doc, ISSUER.company.toUpperCase(), 110, 38, 1.2);
+  textCenteredSpaced(doc, ISSUER.name.toUpperCase(), 110, 38, 1.2);
 
   font(doc, 'Cormorant', 'bold', 34, NAVY);
   textCenteredSpaced(doc, 'ZAŚWIADCZENIE', 105, 78, 2);
@@ -196,12 +190,12 @@ const drawCertificate = async (kind: Exclude<DischargeDocumentKind, 'dyplom'>, s
   signature(doc, 112, 180, 232);
 
   font(doc, 'Montserrat', 'normal', 8, MUTED);
-  doc.text(`${ISSUER.company}  ·  ${ISSUER.address}`, 105, 258, { align: 'center' });
+  doc.text(`${ISSUER.name}  ·  NIP ${ISSUER.nip}  ·  ${ISSUER.address}`, 105, 258, { align: 'center' });
   doc.text(ISSUER.contact, 105, 263, { align: 'center' });
   return doc;
 };
 
-const stayPlace = `w Ośrodku Leczenia Uzależnień MyWay w Kąpinie (${ISSUER.address}), prowadzonym przez ${ISSUER.company}`;
+const stayPlace = `w Ośrodku Leczenia Uzależnień MyWay w Kąpinie (${ISSUER.address}), prowadzonym przez ${ISSUER.name}`;
 
 const certificateBody = (kind: Exclude<DischargeDocumentKind, 'dyplom'>, d: DocumentData): string[] => {
   const period = `w okresie od ${d.stayFrom} do ${d.stayTo}`;
@@ -227,9 +221,9 @@ const drawDiploma = async (d: DocumentData, loadAsset: AssetLoader): Promise<jsP
   const logoW = 58;
   doc.addImage(logo, 'PNG', 148.5 - logoW / 2, 16, logoW, logoW * LOGO_RATIO);
   font(doc, 'Montserrat', 'bold', 8, NAVY);
-  textCenteredSpaced(doc, ISSUER.company.toUpperCase(), 148.5, 41, 1.2);
+  textCenteredSpaced(doc, ISSUER.name.toUpperCase(), 148.5, 41, 1.2);
   font(doc, 'Montserrat', 'normal', 8, MUTED);
-  doc.text(ISSUER.address, 148.5, 46, { align: 'center' });
+  doc.text(`${ISSUER.address}  ·  NIP ${ISSUER.nip}`, 148.5, 46, { align: 'center' });
 
   font(doc, 'Cormorant', 'bold', 52, NAVY);
   textCenteredSpaced(doc, 'DYPLOM', 148.5, 72, 4);
