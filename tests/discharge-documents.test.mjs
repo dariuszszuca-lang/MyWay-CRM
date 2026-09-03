@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  birthDateFromPesel,
   availableDocuments, genderFromPesel, formatDateLongPl, buildDocumentData, documentFileName,
 } from '../services/dischargeDocuments.ts';
 
@@ -41,9 +42,9 @@ test('dane dokumentu wypisanej pacjentki: odmiana żeńska, pobyt do daty wypisu
   assert.equal(d.issuedOn, '21 sierpnia 2026');
 });
 
-test('dane dokumentu aktywnego pacjenta: pobyt do dziś, terapia w toku, brak płci = forma podwójna', () => {
+test('dane dokumentu aktywnego pacjenta: zakres od-do pokazuje CAŁY planowany pobyt, brak płci = forma podwójna', () => {
   const d = buildDocumentData({ ...base, pesel: 'brak', status: 'active', dischargeType: undefined, dischargeDate: undefined }, '2026-08-21');
-  assert.equal(d.stayTo, '21 sierpnia 2026');
+  assert.equal(d.stayTo, '13 lipca 2026');
   assert.equal(d.inProgress, true);
   assert.equal(d.plannedEnd, '13 lipca 2026');
   assert.equal(d.salutation, 'Pan/Pani');
@@ -60,4 +61,10 @@ test('wypisany pacjent bez poprawnego PESEL dostaje formę podwójną w czasie p
 test('nazwa pliku bez polskich znaków i spacji', () => {
   assert.equal(documentFileName('pobyt', base), 'zaswiadczenie-o-pobycie-anna-kowalska-zolc.pdf');
   assert.equal(documentFileName('dyplom', base), 'dyplom-anna-kowalska-zolc.pdf');
+});
+
+test('data urodzenia z PESEL: stulecia 1900 i 2000', () => {
+  assert.equal(birthDateFromPesel('84082100857'), '1984-08-21');
+  assert.equal(birthDateFromPesel('02252909579'), '2002-05-29');
+  assert.equal(birthDateFromPesel('brak'), null);
 });
