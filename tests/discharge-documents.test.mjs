@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  birthDateFromPesel,
+  birthDateFromPesel, DOCUMENT_LABELS,
   availableDocuments, genderFromPesel, formatDateLongPl, buildDocumentData, documentFileName,
 } from '../services/dischargeDocuments.ts';
 
@@ -11,10 +11,21 @@ const base = {
   dischargeType: 'completed', dischargeDate: '2026-07-13',
 };
 
-test('dyplom i zaświadczenie o ukończeniu tylko przy zakończonej terapii', () => {
-  assert.deepEqual(availableDocuments(base), ['dyplom', 'ukonczenie', 'pobyt', 'uczestnictwo']);
-  assert.deepEqual(availableDocuments({ ...base, dischargeType: 'resignation' }), ['pobyt', 'uczestnictwo']);
-  assert.deepEqual(availableDocuments({ ...base, status: 'active', dischargeType: undefined }), ['pobyt', 'uczestnictwo']);
+test('dyplom i zaświadczenie o ukończeniu tylko przy zakończonej terapii, oświadczenie pacjenta zawsze', () => {
+  assert.deepEqual(availableDocuments(base), ['dyplom', 'ukonczenie', 'pobyt', 'uczestnictwo', 'oswiadczenie']);
+  assert.deepEqual(availableDocuments({ ...base, dischargeType: 'resignation' }), ['pobyt', 'uczestnictwo', 'oswiadczenie']);
+  assert.deepEqual(availableDocuments({ ...base, status: 'active', dischargeType: undefined }), ['pobyt', 'uczestnictwo', 'oswiadczenie']);
+});
+
+test('oświadczenie pacjenta ma własną etykietę i nazwę pliku', () => {
+  assert.match(DOCUMENT_LABELS.oswiadczenie, /^Oświadczenie pacjenta/);
+  assert.equal(documentFileName('oswiadczenie', base), 'oswiadczenie-pacjenta-interwencja-medyczna-anna-kowalska-zolc.pdf');
+});
+
+test('data urodzenia: z PESEL, a bez poprawnego PESEL z pola karty pacjenta', () => {
+  assert.equal(buildDocumentData(base, '2026-09-05').birthDate, '1 stycznia 1990');
+  assert.equal(buildDocumentData({ ...base, pesel: 'brak', birthDate: '1985-04-29' }, '2026-09-05').birthDate, '29 kwietnia 1985');
+  assert.equal(buildDocumentData({ ...base, pesel: 'brak' }, '2026-09-05').birthDate, '');
 });
 
 test('płeć z PESEL: 10. cyfra parzysta = kobieta, nieparzysta = mężczyzna, zły PESEL = brak', () => {

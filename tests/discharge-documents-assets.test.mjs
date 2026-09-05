@@ -10,8 +10,10 @@ test('dyplom potrzebuje tła poziomego, logo i czterech fontów', () => {
   assert.ok(Object.values(a.fonts).every(p => p.startsWith('/dokumenty/fonts/') && p.endsWith('.ttf')));
 });
 
-test('zaświadczenia używają tła pionowego', () => {
-  for (const kind of ['ukonczenie', 'pobyt', 'uczestnictwo']) {
-    assert.equal(requiredAssets(kind).background, '/dokumenty/tlo-zaswiadczenie.jpg', kind);
+test('zaświadczenia i oświadczenie nie mają tła: biały papier, logo na górze (Natalia 05.09.2026)', () => {
+  for (const kind of ['ukonczenie', 'pobyt', 'uczestnictwo', 'oswiadczenie']) {
+    const a = requiredAssets(kind);
+    assert.equal(a.background, null, kind);
+    assert.equal(a.logo, '/dokumenty/logo-myway.png', kind);
   }
 });

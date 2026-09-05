@@ -10,8 +10,9 @@ interface Props {
   compact?: boolean; // true = w wierszu listy (zwinięte pod przyciskiem), false = pełna lista (modal wypisu)
 }
 
-// Dokumenty wypisowe: dyplom i zaświadczenie o ukończeniu tylko po zakończonej terapii,
-// zaświadczenia o pobycie i uczestnictwie także dla aktywnych pacjentów (daty do dziś).
+// Dokumenty pacjenta: dyplom i zaświadczenie o ukończeniu tylko po zakończonej terapii,
+// zaświadczenia o pobycie i uczestnictwie także dla aktywnych pacjentów (pełny planowany pobyt),
+// oświadczenie pacjenta (odpłatna interwencja medyczna) zawsze, jako formularz do wypełnienia.
 const DischargeDocuments: React.FC<Props> = ({ patient, compact = false }) => {
   const [open, setOpen] = useState(!compact);
   const [busy, setBusy] = useState<string | null>(null);
@@ -72,7 +73,7 @@ const DischargeDocuments: React.FC<Props> = ({ patient, compact = false }) => {
           Dokumenty do wydania
         </div>
         {list}
-        {kinds.length < 4 && (
+        {!kinds.includes('dyplom') && (
           <div className="mt-2 text-[11px] text-gray-500">Dyplom i zaświadczenie o ukończeniu są dostępne po wypisie z powodem „Zakończenie terapii”.</div>
         )}
       </div>
@@ -84,7 +85,7 @@ const DischargeDocuments: React.FC<Props> = ({ patient, compact = false }) => {
       <button
         onClick={() => setOpen(o => !o)}
         className="w-full justify-center inline-flex items-center gap-1 px-3 py-1.5 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 text-xs font-semibold"
-        title="Dyplom i zaświadczenia (PDF / wydruk)"
+        title="Dyplom, zaświadczenia i oświadczenie pacjenta (PDF / wydruk)"
       >
         <ScrollText className="w-3 h-3" />
         Zaświadczenia ({kinds.length})

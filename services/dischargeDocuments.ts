@@ -2,19 +2,25 @@ import type jsPDF from 'jspdf';
 import { PACKAGE_LABELS, type Patient, type PatientPackage } from '../types.ts';
 import { createPdf, fetchAsset, registerFont, textCenteredSpaced, type AssetLoader } from './pdfBase.ts';
 import { ISSUER } from './issuer.ts';
+import { drawPatientStatement } from './patientStatement.ts';
 
-// Dokumenty wypisowe: dyplom, zaświadczenie o ukończeniu terapii, o pobycie, o uczestnictwie.
+// Dokumenty pacjenta: dyplom, zaświadczenie o ukończeniu terapii, o pobycie, o uczestnictwie
+// oraz oświadczenie pacjenta (odpłatna interwencja medyczna, formularz do wypełnienia przy przyjęciu).
 // Część „dane" (kwalifikacja, odmiana, daty, nazwy plików) jest czysta i testowana w tests/.
 // Część „PDF" rysuje dokument na wspólnej bazie (pdfBase). Importy z rozszerzeniem .ts, żeby
 // tools/podglad-dokumentow-wypisu.mjs mógł wyrenderować podgląd w Node bez przeglądarki.
+// Forma zaświadczeń i oświadczenia (prośba Natalii 05.09.2026): pismo urzędowe, biały papier bez tła,
+// logo na górze, czarny druk. Tło premium ma wyłącznie dyplom.
 
-export type DischargeDocumentKind = 'dyplom' | 'ukonczenie' | 'pobyt' | 'uczestnictwo';
+export type DischargeDocumentKind = 'dyplom' | 'ukonczenie' | 'pobyt' | 'uczestnictwo' | 'oswiadczenie';
+type CertificateKind = 'ukonczenie' | 'pobyt' | 'uczestnictwo';
 
 export const DOCUMENT_LABELS: Record<DischargeDocumentKind, string> = {
   dyplom: 'Dyplom imienny',
   ukonczenie: 'Zaświadczenie o ukończeniu terapii',
   pobyt: 'Zaświadczenie o pobycie',
   uczestnictwo: 'Zaświadczenie o uczestnictwie w terapii',
+  oswiadczenie: 'Oświadczenie pacjenta (odpłatna interwencja medyczna)',
 };
 
 const FILE_PREFIX: Record<DischargeDocumentKind, string> = {
@@ -22,11 +28,14 @@ const FILE_PREFIX: Record<DischargeDocumentKind, string> = {
   ukonczenie: 'zaswiadczenie-o-ukonczeniu-terapii',
   pobyt: 'zaswiadczenie-o-pobycie',
   uczestnictwo: 'zaswiadczenie-o-uczestnictwie-w-terapii',
+  oswiadczenie: 'oswiadczenie-pacjenta-interwencja-medyczna',
 };
 
-// Minimalny wycinek pacjenta potrzebny do dokumentów (testy podają zwykłe obiekty)
+// Minimalny wycinek pacjenta potrzebny do dokumentów (testy podają zwykłe obiekty).
+// birthDate jest opcjonalne: normalnie datę urodzenia liczymy z PESEL, pole karty to zapas.
 export type DocumentPatient = Pick<Patient,
-  'firstName' | 'lastName' | 'pesel' | 'package' | 'treatmentStartDate' | 'treatmentEndDate' | 'status' | 'dischargeType' | 'dischargeDate'>;
+  'firstName' | 'lastName' | 'pesel' | 'package' | 'treatmentStartDate' | 'treatmentEndDate' | 'status' | 'dischargeType' | 'dischargeDate'>
+  & Partial<Pick<Patient, 'birthDate'>>;
 
 
 const MONTHS_GENITIVE = ['stycznia', 'lutego', 'marca', 'kwietnia', 'maja', 'czerwca', 'lipca', 'sierpnia', 'września', 'października', 'listopada', 'grudnia'];
@@ -61,8 +70,11 @@ export const birthDateFromPesel = (pesel: string): string | null => {
 
 const isCompletedDischarge = (p: DocumentPatient): boolean => p.status === 'discharged' && p.dischargeType === 'completed';
 
+// Oświadczenie pacjenta to formularz przyjęciowy, dostępny zawsze (Krystian 05.09.2026: „w części przed wypisem")
 export const availableDocuments = (p: DocumentPatient): DischargeDocumentKind[] =>
-  isCompletedDischarge(p) ? ['dyplom', 'ukonczenie', 'pobyt', 'uczestnictwo'] : ['pobyt', 'uczestnictwo'];
+  isCompletedDischarge(p)
+    ? ['dyplom', 'ukonczenie', 'pobyt', 'uczestnictwo', 'oswiadczenie']
+    : ['pobyt', 'uczestnictwo', 'oswiadczenie'];
 
 export interface DocumentData {
   fullName: string;
@@ -83,7 +95,8 @@ export const buildDocumentData = (p: DocumentPatient, todayIso: string): Documen
   const gender = genderFromPesel(p.pesel);
   const inProgress = p.status !== 'discharged';
   const past = (m: string, f: string, both: string) => (gender === 'm' ? m : gender === 'f' ? f : both);
-  const birthIso = birthDateFromPesel(p.pesel);
+  // Data urodzenia z PESEL; bez poprawnego PESEL bierzemy pole „data urodzenia" z karty pacjenta
+  const birthIso = birthDateFromPesel(p.pesel) || p.birthDate || '';
   return {
     fullName: `${p.firstName} ${p.lastName}`.trim(),
     firstName: p.firstName.trim(),
@@ -120,13 +133,13 @@ export const documentFileName = (kind: DischargeDocumentKind, p: Pick<DocumentPa
 // ---------- PDF ----------
 
 export interface DocumentAssets {
-  background: string;
+  background: string | null; // tło ma tylko dyplom; zaświadczenia i oświadczenie = biały papier
   logo: string;
   fonts: { cormorantRegular: string; cormorantBold: string; montserratRegular: string; montserratBold: string };
 }
 
 export const requiredAssets = (kind: DischargeDocumentKind): DocumentAssets => ({
-  background: kind === 'dyplom' ? '/dokumenty/tlo-dyplom.jpg' : '/dokumenty/tlo-zaswiadczenie.jpg',
+  background: kind === 'dyplom' ? '/dokumenty/tlo-dyplom.jpg' : null,
   logo: '/dokumenty/logo-myway.png',
   fonts: {
     cormorantRegular: '/dokumenty/fonts/CormorantGaramond-Medium.ttf',
@@ -136,10 +149,14 @@ export const requiredAssets = (kind: DischargeDocumentKind): DocumentAssets => (
   },
 });
 
+// Dyplom (tło premium): granat, turkus, atrament, szarość
 const NAVY: [number, number, number] = [27, 46, 90];    // #1B2E5A
 const TEAL: [number, number, number] = [42, 157, 143];   // #2A9D8F
 const INK: [number, number, number] = [38, 44, 58];
 const MUTED: [number, number, number] = [112, 118, 130];
+// Zaświadczenia (pismo urzędowe, bez kolorów): czerń i szarość
+const BLACK: [number, number, number] = [0, 0, 0];
+const GRAY: [number, number, number] = [95, 95, 95];
 const LOGO_RATIO = 345 / 1196; // proporcje logo poziomego
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
@@ -151,7 +168,7 @@ const prepare = async (kind: DischargeDocumentKind, loadAsset: AssetLoader): Pro
   const landscape = kind === 'dyplom';
   const doc = createPdf({ orientation: landscape ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
   const [background, logo] = await Promise.all([
-    loadAsset(assets.background),
+    assets.background ? loadAsset(assets.background) : Promise.resolve(null),
     loadAsset(assets.logo),
     registerFont(doc, loadAsset, assets.fonts.cormorantRegular, 'Cormorant', 'normal'),
     registerFont(doc, loadAsset, assets.fonts.cormorantBold, 'Cormorant', 'bold'),
@@ -160,7 +177,7 @@ const prepare = async (kind: DischargeDocumentKind, loadAsset: AssetLoader): Pro
   ]);
   const w = landscape ? 297 : 210;
   const h = landscape ? 210 : 297;
-  doc.addImage(new Uint8Array(background), 'JPEG', 0, 0, w, h);
+  if (background) doc.addImage(new Uint8Array(background), 'JPEG', 0, 0, w, h);
   return { doc, logo: new Uint8Array(logo), w, h };
 };
 
@@ -170,57 +187,55 @@ const font = (doc: jsPDF, family: 'Cormorant' | 'Montserrat', style: 'normal' | 
   doc.setTextColor(...color);
 };
 
-const signature = (doc: jsPDF, x1: number, x2: number, y: number) => {
-  doc.setDrawColor(...NAVY);
+const signature = (doc: jsPDF, x1: number, x2: number, y: number, lineColor = NAVY, labelColor = MUTED) => {
+  doc.setDrawColor(...lineColor);
   doc.setLineWidth(0.3);
   doc.line(x1, y, x2, y);
-  font(doc, 'Montserrat', 'normal', 8, MUTED);
+  font(doc, 'Montserrat', 'normal', 8, labelColor);
   doc.text('podpis i pieczęć Ośrodka', (x1 + x2) / 2, y + 5, { align: 'center' });
 };
 
-// Zaświadczenie A4 pionowo
-const drawCertificate = async (kind: Exclude<DischargeDocumentKind, 'dyplom'>, subtitle: string, body: string[], d: DocumentData, loadAsset: AssetLoader): Promise<jsPDF> => {
+// Zaświadczenie A4 pionowo. Pismo urzędowe (Natalia 05.09.2026): biały papier, logo na górze,
+// czarny druk, bez kolorowych linii i podtytułów. Fonty te same co na dyplomie.
+const drawCertificate = async (kind: CertificateKind, subtitle: string, body: string[], d: DocumentData, loadAsset: AssetLoader): Promise<jsPDF> => {
   const { doc, logo } = await prepare(kind, loadAsset);
   const logoW = 46;
-  doc.addImage(logo, 'PNG', 110 - logoW / 2, 16, logoW, logoW * LOGO_RATIO);
-  font(doc, 'Montserrat', 'bold', 8, NAVY);
-  textCenteredSpaced(doc, ISSUER.name.toUpperCase(), 110, 38, 1.2);
+  doc.addImage(logo, 'PNG', 105 - logoW / 2, 16, logoW, logoW * LOGO_RATIO);
+  font(doc, 'Montserrat', 'bold', 8, BLACK);
+  textCenteredSpaced(doc, ISSUER.name.toUpperCase(), 105, 38, 1.2);
 
-  font(doc, 'Cormorant', 'bold', 34, NAVY);
-  textCenteredSpaced(doc, 'ZAŚWIADCZENIE', 105, 78, 2);
-  font(doc, 'Montserrat', 'bold', 9.5, TEAL);
-  textCenteredSpaced(doc, subtitle.toUpperCase(), 105, 87, 2.5);
-  doc.setDrawColor(...TEAL);
-  doc.setLineWidth(0.4);
-  doc.line(90, 93, 120, 93);
+  font(doc, 'Cormorant', 'bold', 32, BLACK);
+  textCenteredSpaced(doc, 'ZAŚWIADCZENIE', 105, 66, 2);
+  font(doc, 'Montserrat', 'bold', 9.5, BLACK);
+  textCenteredSpaced(doc, subtitle.toUpperCase(), 105, 75, 2.5);
 
-  font(doc, 'Cormorant', 'normal', 14, MUTED);
-  doc.text('Zaświadcza się, że', 105, 106, { align: 'center' });
-  font(doc, 'Cormorant', 'bold', 24, NAVY);
-  doc.text(`${d.salutation} ${d.fullName}`, 105, 117, { align: 'center' });
-  font(doc, 'Montserrat', 'normal', 9, MUTED);
+  font(doc, 'Cormorant', 'normal', 14, GRAY);
+  doc.text('Zaświadcza się, że', 105, 92, { align: 'center' });
+  font(doc, 'Cormorant', 'bold', 24, BLACK);
+  doc.text(`${d.salutation} ${d.fullName}`, 105, 103, { align: 'center' });
+  font(doc, 'Montserrat', 'normal', 9, GRAY);
   const idLine = d.birthDate ? `ur. ${d.birthDate} r.  ·  PESEL ${d.pesel}` : `PESEL ${d.pesel}`;
-  doc.text(idLine, 105, 124, { align: 'center' });
+  doc.text(idLine, 105, 110, { align: 'center' });
 
   // dłuższe treści (program + kontynuacja) dostają mniejszy stopień pisma, żeby zmieścić się nad stopką
   const long = body.length > 2;
   const bodySize = long ? 12 : 13.5;
   const gap = long ? 3 : 5;
-  font(doc, 'Cormorant', 'normal', bodySize, INK);
-  let y = long ? 134 : 140;
+  font(doc, 'Cormorant', 'normal', bodySize, BLACK);
+  let y = long ? 122 : 128;
   for (const paragraph of body) {
     const lines = doc.splitTextToSize(paragraph, 150) as string[];
     doc.text(lines, 30, y, { lineHeightFactor: 1.3 });
     y += lines.length * bodySize * 0.3528 * 1.3 + gap;
   }
-  font(doc, 'Montserrat', 'normal', 8.5, MUTED);
+  font(doc, 'Montserrat', 'normal', 8.5, GRAY);
   doc.text('Zaświadczenie wydaje się na prośbę osoby zainteresowanej.', 30, Math.min(y + 5, 214), { maxWidth: 150 });
 
-  font(doc, 'Montserrat', 'normal', 9, MUTED);
+  font(doc, 'Montserrat', 'normal', 9, GRAY);
   doc.text(`Kąpino, dnia ${d.issuedOn}`, 180, 221, { align: 'right' });
-  signature(doc, 112, 180, 232);
+  signature(doc, 112, 180, 232, BLACK, GRAY);
 
-  font(doc, 'Montserrat', 'normal', 8, MUTED);
+  font(doc, 'Montserrat', 'normal', 8, GRAY);
   doc.text(`${ISSUER.name}  ·  NIP ${ISSUER.nip}  ·  ${ISSUER.address}`, 105, 258, { align: 'center' });
   doc.text(ISSUER.contact, 105, 263, { align: 'center' });
   return doc;
@@ -240,7 +255,7 @@ const PROGRAM_BULLETS = [
 const CONTINUATION =
   'Wskazana jest dalsza kontynuacja leczenia w formie ambulatoryjnej (np. w poradni leczenia uzależnień, indywidualnych spotkań z terapeutą uzależnień bądź psychologiem lub korzystania z grup wsparcia).';
 
-const certificateBody = (kind: Exclude<DischargeDocumentKind, 'dyplom'>, d: DocumentData): string[] => {
+const certificateBody = (kind: CertificateKind, d: DocumentData): string[] => {
   const period = `w terminie od ${d.stayFrom} do ${d.stayTo}`;
   const programHeader = d.inProgress ? 'Program terapeutyczny obejmuje pracę nad:' : 'Program terapeutyczny obejmował pracę nad:';
   switch (kind) {
@@ -318,7 +333,11 @@ export const generateDischargeDocument = async (
   const d = buildDocumentData(patient, options.today || todayIso());
   const loadAsset = options.loadAsset || fetchAsset;
   if (kind === 'dyplom') return drawDiploma(d, loadAsset);
-  const subtitles: Record<Exclude<DischargeDocumentKind, 'dyplom'>, string> = {
+  if (kind === 'oswiadczenie') {
+    const { doc, logo } = await prepare(kind, loadAsset);
+    return drawPatientStatement(doc, logo, d);
+  }
+  const subtitles: Record<CertificateKind, string> = {
     ukonczenie: 'o ukończeniu terapii',
     pobyt: 'o pobycie w ośrodku',
     uczestnictwo: 'o uczestnictwie w terapii',
