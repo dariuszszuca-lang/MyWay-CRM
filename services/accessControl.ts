@@ -4,12 +4,14 @@ export const ALLOWED_EMAILS = [
   'mywaymarcin@gmail.com',
   'npucz708@gmail.com',
   'gabinet.osrodekmyway@gmail.com',
+  'beatakorzonek1@gmail.com',
 ];
 
 export const STATS_ACCESS_EMAILS = [
   'mywaymarcin@gmail.com',
   'npucz708@gmail.com',
   'krystiannagaba@gmail.com',
+  'beatakorzonek1@gmail.com',
 ];
 
 const normalizeEmail = (email?: string | null) => email?.trim().toLowerCase() || '';
