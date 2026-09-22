@@ -4,7 +4,7 @@ import { createPdf, fetchAsset, registerFont, textCenteredSpaced, type AssetLoad
 import { ISSUER } from './issuer.ts';
 import { drawPatientStatement } from './patientStatement.ts';
 
-// Dokumenty pacjenta: dyplom, zaświadczenie o ukończeniu terapii, o pobycie, o uczestnictwie
+// Dokumenty pacjenta: dyplom, zaświadczenie o ukończeniu terapii, o pobycie, o uczestnictwie (tylko po wypisie)
 // oraz oświadczenie pacjenta (odpłatna interwencja medyczna, formularz do wypełnienia przy przyjęciu).
 // Część „dane" (kwalifikacja, odmiana, daty, nazwy plików) jest czysta i testowana w tests/.
 // Część „PDF" rysuje dokument na wspólnej bazie (pdfBase). Importy z rozszerzeniem .ts, żeby
@@ -70,11 +70,16 @@ export const birthDateFromPesel = (pesel: string): string | null => {
 
 const isCompletedDischarge = (p: DocumentPatient): boolean => p.status === 'discharged' && p.dischargeType === 'completed';
 
-// Oświadczenie pacjenta to formularz przyjęciowy, dostępny zawsze (Krystian 05.09.2026: „w części przed wypisem")
-export const availableDocuments = (p: DocumentPatient): DischargeDocumentKind[] =>
-  isCompletedDischarge(p)
-    ? ['dyplom', 'ukonczenie', 'pobyt', 'uczestnictwo', 'oswiadczenie']
-    : ['pobyt', 'uczestnictwo', 'oswiadczenie'];
+const isDischarged = (p: DocumentPatient): boolean => p.status === 'discharged';
+
+// Oświadczenie pacjenta to formularz przyjęciowy, dostępny zawsze (Krystian 05.09.2026: „w części przed wypisem").
+// Zaświadczenie o uczestnictwie tylko po wypisie, niezależnie od powodu (Darek 22.09.2026: nie dla aktywnych pacjentów).
+// Dyplom i zaświadczenie o ukończeniu tylko po wypisie z powodem „Zakończenie terapii".
+export const availableDocuments = (p: DocumentPatient): DischargeDocumentKind[] => {
+  if (isCompletedDischarge(p)) return ['dyplom', 'ukonczenie', 'pobyt', 'uczestnictwo', 'oswiadczenie'];
+  if (isDischarged(p)) return ['pobyt', 'uczestnictwo', 'oswiadczenie'];
+  return ['pobyt', 'oswiadczenie'];
+};
 
 export interface DocumentData {
   fullName: string;

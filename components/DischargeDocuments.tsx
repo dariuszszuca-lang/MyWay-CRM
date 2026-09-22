@@ -11,8 +11,8 @@ interface Props {
 }
 
 // Dokumenty pacjenta: dyplom i zaświadczenie o ukończeniu tylko po zakończonej terapii,
-// zaświadczenia o pobycie i uczestnictwie także dla aktywnych pacjentów (pełny planowany pobyt),
-// oświadczenie pacjenta (odpłatna interwencja medyczna) zawsze, jako formularz do wypełnienia.
+// zaświadczenie o uczestnictwie po każdym wypisie, zaświadczenie o pobycie także dla aktywnych
+// pacjentów (pełny planowany pobyt), oświadczenie pacjenta (odpłatna interwencja medyczna) zawsze.
 const DischargeDocuments: React.FC<Props> = ({ patient, compact = false }) => {
   const [open, setOpen] = useState(!compact);
   const [busy, setBusy] = useState<string | null>(null);
@@ -73,6 +73,9 @@ const DischargeDocuments: React.FC<Props> = ({ patient, compact = false }) => {
           Dokumenty do wydania
         </div>
         {list}
+        {!kinds.includes('uczestnictwo') && (
+          <div className="mt-2 text-[11px] text-gray-500">Zaświadczenie o uczestnictwie jest dostępne po wypisie pacjenta.</div>
+        )}
         {!kinds.includes('dyplom') && (
           <div className="mt-2 text-[11px] text-gray-500">Dyplom i zaświadczenie o ukończeniu są dostępne po wypisie z powodem „Zakończenie terapii”.</div>
         )}

@@ -11,10 +11,17 @@ const base = {
   dischargeType: 'completed', dischargeDate: '2026-07-13',
 };
 
-test('dyplom i zaświadczenie o ukończeniu tylko przy zakończonej terapii, oświadczenie pacjenta zawsze', () => {
+test('dyplom i ukończenie tylko przy zakończonej terapii, uczestnictwo po każdym wypisie, oświadczenie zawsze', () => {
   assert.deepEqual(availableDocuments(base), ['dyplom', 'ukonczenie', 'pobyt', 'uczestnictwo', 'oswiadczenie']);
   assert.deepEqual(availableDocuments({ ...base, dischargeType: 'resignation' }), ['pobyt', 'uczestnictwo', 'oswiadczenie']);
-  assert.deepEqual(availableDocuments({ ...base, status: 'active', dischargeType: undefined }), ['pobyt', 'uczestnictwo', 'oswiadczenie']);
+  assert.deepEqual(availableDocuments({ ...base, status: 'active', dischargeType: undefined }), ['pobyt', 'oswiadczenie']);
+});
+
+test('aktywny pacjent nie ma zaświadczenia o uczestnictwie (Darek 22.09.2026)', () => {
+  const active = availableDocuments({ ...base, status: 'active', dischargeType: undefined, dischargeDate: undefined });
+  assert.ok(!active.includes('uczestnictwo'));
+  assert.ok(!active.includes('dyplom'));
+  assert.ok(active.includes('pobyt') && active.includes('oswiadczenie'));
 });
 
 test('oświadczenie pacjenta ma własną etykietę i nazwę pliku', () => {

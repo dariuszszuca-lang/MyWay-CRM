@@ -1,5 +1,10 @@
 # CHANGELOG deployów PROD (zespół używa Vercel www.myway-crm.pl, auto-deploy z `main`; Firebase Hosting myway-crm-a4593.web.app = kopia równoległa, deploy ręczny)
 
+## [2026-09-22] zaświadczenie o uczestnictwie tylko po wypisie
+- Zaświadczenie o uczestnictwie w terapii zdjęte z listy dokumentów aktywnych pacjentów (Darek 22.09.2026). Dostępne po wypisie z dowolnym powodem; dyplom i zaświadczenie o ukończeniu nadal tylko przy powodzie „Zakończenie terapii". Zaświadczenie o pobycie i oświadczenie pacjenta bez zmian (także dla aktywnych).
+- Podpowiedź w karcie „Dokumenty do wydania" dla aktywnych: „Zaświadczenie o uczestnictwie jest dostępne po wypisie pacjenta."
+- Testy 47/47 (nowy test: aktywny pacjent bez uczestnictwa). Deploy: `git push main` → Vercel www.myway-crm.pl (wpis o weryfikacji bundla poniżej po wdrożeniu).
+
 ## [2026-09-05] commit eb72497, oświadczenie pacjenta + zaświadczenia bez grafiki
 - Nowy dokument „Oświadczenie pacjenta (odpłatna interwencja medyczna)" na liście zaświadczeń, dla każdego pacjenta (prośba Krystiana 05.09.2026, wzór PDF przez WhatsApp). System uzupełnia imię i nazwisko, PESEL z datą urodzenia i datę przyjęcia; reszta (godzina, promile, koszt, kratki, podpisy) do ręcznego wypełnienia. A4, 2 strony, `services/patientStatement.ts`.
 - Zaświadczenia o ukończeniu, pobycie i uczestnictwie w formie urzędowej (prośba Natalii 05.09.2026): biały papier bez tła, logo na górze, czarny druk. Dyplom bez zmian, tło premium zostaje.
