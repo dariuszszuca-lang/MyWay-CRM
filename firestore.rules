@@ -17,7 +17,8 @@ service cloud.firestore {
         'krystiannagaba@gmail.com',
         'mywaymarcin@gmail.com',
         'npucz708@gmail.com',
-        'gabinet.osrodekmyway@gmail.com'
+        'gabinet.osrodekmyway@gmail.com',
+        'beatakorzonek1@gmail.com'
       ];
     }
 

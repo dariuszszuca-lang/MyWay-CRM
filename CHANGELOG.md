@@ -1,3 +1,9 @@
+## 2026-09-23 — naprawa dostępu Beaty do danych CRM
+
+Beata mogła zalogować się do interfejsu, lecz brakowało jej na osobnej liście Firestore. Dopisano wyłącznie jej konto do istniejących reguł patients, queue, rooms i roomAssignments. Lista dostępu do statystyk pozostaje bez zmian (Beata wykluczona). Dodano test zgodności list interfejsu i bazy oraz test dostępu Beaty bez statystyk.
+
+Weryfikacja przed wdrożeniem: produkcyjne reguły zgodne z wcześniejszym plikiem, brak konta Beaty; 100 syntetycznych przypadków Rules API potwierdzało odmowę przed i 100 potwierdza poprawny zakres po zmianie, w tym brak dostępu obcych, niezalogowanych i niezweryfikowanych kont. 49 testów aplikacji PASS. Bez odczytu lub zmian kart pacjentów. Poprzedni ruleset do rollback: 36e71d69-9ded-4206-9135-f35f16c17c59.
+
 # CHANGELOG deployów PROD (zespół używa Vercel www.myway-crm.pl, auto-deploy z `main`; Firebase Hosting myway-crm-a4593.web.app = kopia równoległa, deploy ręczny)
 
 ## [2026-09-22] zaświadczenie o uczestnictwie tylko po wypisie
