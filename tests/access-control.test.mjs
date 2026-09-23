@@ -19,3 +19,12 @@ test('Beata ma dostęp do aplikacji, ale nie do statystyk', () => {
  assert.equal(canAccessApp('obcy@example.invalid'), false);
  assert.equal(canAccessApp(null), false);
 });
+
+test('nowy zespół ma CRM bez statystyk, Natalia pełny dostęp', () => {
+ for (const email of ['waldemarsikorski77@gmail.com','stanislaw.babinski@gmail.com','patrycjabjerk88@gmail.com','kuskowskam@gmail.com']) {
+  assert.equal(canAccessApp(email), true, email);
+  assert.equal(canAccessStats(email), false, email);
+ }
+ assert.equal(canAccessApp('Npucz708@gmail.com'), true);
+ assert.equal(canAccessStats('Npucz708@gmail.com'), true);
+});

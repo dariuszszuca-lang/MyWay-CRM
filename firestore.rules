@@ -18,7 +18,11 @@ service cloud.firestore {
         'mywaymarcin@gmail.com',
         'npucz708@gmail.com',
         'gabinet.osrodekmyway@gmail.com',
-        'beatakorzonek1@gmail.com'
+        'beatakorzonek1@gmail.com',
+        'waldemarsikorski77@gmail.com',
+        'stanislaw.babinski@gmail.com',
+        'patrycjabjerk88@gmail.com',
+        'kuskowskam@gmail.com'
       ];
     }
 

@@ -1,3 +1,7 @@
+## 2026-09-23 — dostęp zespołu według listy Darka
+
+Dodano Waldka, Stanisława, Patrycję i Małgosię do aplikacji i reguł Firestore, bez statystyk. Natalia Pucz zachowuje pełny dostęp ze statystykami. Te same cztery konta są dodawane do ORDERS_ALLOWED_EMAILS funkcji ordersApi (Dziennik), z zachowaniem istniejących sześciu kont i pozostałej konfiguracji. Adresy zweryfikowane z przekazanym zrzutem. 50 testów aplikacji i build PASS; Rules API: 180 przypadków przed i 180 po zmianie PASS, również odmowy dla kont obcych i niezweryfikowanych. Bez zmian danych pacjentów. Rollback: commit aadad43 i ruleset d0674eba-65de-44c1-bf16-34595d595ba9.
+
 ## 2026-09-23 — naprawa dostępu Beaty do danych CRM
 
 Beata mogła zalogować się do interfejsu, lecz brakowało jej na osobnej liście Firestore. Dopisano wyłącznie jej konto do istniejących reguł patients, queue, rooms i roomAssignments. Lista dostępu do statystyk pozostaje bez zmian (Beata wykluczona). Dodano test zgodności list interfejsu i bazy oraz test dostępu Beaty bez statystyk.

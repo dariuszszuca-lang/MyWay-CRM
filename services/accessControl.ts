@@ -5,6 +5,10 @@ export const ALLOWED_EMAILS = [
   'npucz708@gmail.com',
   'gabinet.osrodekmyway@gmail.com',
   'beatakorzonek1@gmail.com',
+  'waldemarsikorski77@gmail.com',
+  'stanislaw.babinski@gmail.com',
+  'patrycjabjerk88@gmail.com',
+  'kuskowskam@gmail.com',
 ];
 
 export const STATS_ACCESS_EMAILS = [
