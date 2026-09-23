@@ -2,9 +2,11 @@
 
 Beata mogła zalogować się do interfejsu, lecz brakowało jej na osobnej liście Firestore. Dopisano wyłącznie jej konto do istniejących reguł patients, queue, rooms i roomAssignments. Lista dostępu do statystyk pozostaje bez zmian (Beata wykluczona). Dodano test zgodności list interfejsu i bazy oraz test dostępu Beaty bez statystyk.
 
-Weryfikacja przed wdrożeniem: produkcyjne reguły zgodne z wcześniejszym plikiem, brak konta Beaty; 100 syntetycznych przypadków Rules API potwierdzało odmowę przed i 100 potwierdza poprawny zakres po zmianie, w tym brak dostępu obcych, niezalogowanych i niezweryfikowanych kont. 49 testów aplikacji PASS. Bez odczytu lub zmian kart pacjentów. Poprzedni ruleset do rollback: 36e71d69-9ded-4206-9135-f35f16c17c59.
+Weryfikacja przed wdrożeniem: produkcyjne reguły zgodne z wcześniejszym plikiem, brak konta Beaty; 100 syntetycznych przypadków Rules API potwierdzało odmowę przed i 100 potwierdza poprawny zakres po zmianie, w tym brak dostępu obcych, niezalogowanych i niezweryfikowanych kont. 49 testów aplikacji PASS. Bez odczytu lub zmian kart pacjentów. Wdrożono reguły produkcyjne23.09 o14:24UTC, ruleset `d0674eba-65de-44c1-bf16-34595d595ba9`; ponowny odczyt potwierdza dokładnie dopisanie Beaty. Kod/testy: commit35291bf, push main. HTTP200 na www.myway-crm.pl. Poprzedni ruleset do rollback: 36e71d69-9ded-4206-9135-f35f16c17c59.
 
 # CHANGELOG deployów PROD (zespół używa Vercel www.myway-crm.pl, auto-deploy z `main`; Firebase Hosting myway-crm-a4593.web.app = kopia równoległa, deploy ręczny)
+
+Dostęp Dziennik: zaktualizowano wyłącznie `ORDERS_ALLOWED_EMAILS` istniejącej funkcji `ordersApi` w `eduway-f13c4/europe-west1` (lista5→6, Beata dodana, bez wdrażania kodu funkcji). Operacja zakończona, ACTIVE23.09 o14:27:36UTC. Statystyki: nadal canAccessStats=false; chroniony przycisk, przejście i render zakładki. Odbiór na rzeczywistej sesji Beaty wymaga jej odświeżenia/logowania; nie podszywano się pod użytkownika.
 
 ## [2026-09-22] zaświadczenie o uczestnictwie tylko po wypisie
 - Zaświadczenie o uczestnictwie w terapii zdjęte z listy dokumentów aktywnych pacjentów (Darek 22.09.2026). Dostępne po wypisie z dowolnym powodem; dyplom i zaświadczenie o ukończeniu nadal tylko przy powodzie „Zakończenie terapii". Zaświadczenie o pobycie i oświadczenie pacjenta bez zmian (także dla aktywnych).
