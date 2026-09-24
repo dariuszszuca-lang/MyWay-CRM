@@ -1,6 +1,6 @@
 # Telefony — zakres do wdrożenia
 
-Stan: implementacja i weryfikacja lokalna zakończone. Produkcja oraz historia kontaktów pozostają bez zmian. Ostatni sprawdzony punkt wyjścia: `d252335`.
+Stan24.09: backend wdrożony za zgodą Darka, frontend przygotowany do publikacji. Historia kontaktów niezaimportowana. Ostatni sprawdzony punkt wyjścia: `d252335`.
 
 ## Funkcje
 
@@ -8,7 +8,7 @@ Menu w osobnym rzędzie, zakładka Telefony z Dziennikiem, Kontaktami, Analizą 
 
 Automat codziennie o 00:30 Europe/Warsaw sprawdza zakończone tygodnie, miesiące i lata. Zapisuje raporty do CRM, bez wysyłania maili. Po przerwie uzupełnia okresy od ostatniego poprawnego sprawdzenia. Ponowienie nie dubluje raportów. Pierwsze uruchomienie obejmuje poprzedni tydzień, miesiąc i rok. Raport jest migawką stanu wpisów w chwili generowania; późniejsze korekty danych można uwzględnić raportem na żądanie.
 
-Uprawnienia do Analizy, Raportów i kwot odpowiadają istniejącym uprawnieniom statystyk CRM. Pozostali pracownicy prowadzą kontakty i dziennik. Zapisy mają kontrolę równoczesnej edycji i historię zmian. Rozmowy są dopisywane; nie ma usuwania ani edycji już zapisanego wpisu rozmowy. Dane pacjentów nie są migrowane. Wyliczenia deterministyczne: AI_ACT_CHECK NIE_DOTYCZY.
+Uprawnienia do Analizy, Raportów i kwot odpowiadają uprawnieniom statystyk CRM, rozszerzonym24.09 na jawne polecenie o konto Darka. Pozostali pracownicy prowadzą kontakty i dziennik. Zapisy mają kontrolę równoczesnej edycji i historię zmian. Rozmowy są dopisywane; nie ma usuwania ani edycji już zapisanego wpisu rozmowy. Dane pacjentów nie są migrowane. Wyliczenia deterministyczne: AI_ACT_CHECK NIE_DOTYCZY.
 
 ## Zgoda i kolejność wdrożenia
 
@@ -31,9 +31,11 @@ Odczytano wszystkie 7 załączników z maila Marcina z 23.09.2026. CSV zawiera 7
 
 ## Weryfikacja
 
-- `npm test`: 59 testów, w tym granice tygodni/lat, czas PL, liczenie kontaktów i rozmów, walidacja, brakujące dane, powtórzenia harmonogramu.
+- `npm test`: 60 testów, w tym granice tygodni/lat, czas PL, liczenie kontaktów i rozmów, walidacja, brakujące dane, powtórzenia harmonogramu.
 - `npm run build`: TypeScript i build aplikacji.
-- `GCLOUD_PROJECT=demo-myway-telefony FIRESTORE_EMULATOR_HOST=127.0.0.1:8185 node --test tests/integration/phone-rules.mjs`: 6 testów reguł, atomowych zapisów, uprawnień i harmonogramu z Admin SDK; wymaga uruchomionego emulatora i zależności `functions/telephony`.
+- `GCLOUD_PROJECT=demo-myway-telefony FIRESTORE_EMULATOR_HOST=127.0.0.1:8185 node --test tests/integration/phone-rules.mjs`: 7 testów reguł, atomowych zapisów, uprawnień i harmonogramu z Admin SDK; wymaga uruchomionego emulatora i zależności `functions/telephony`.
 - Podgląd `npx vite --config tools/phone-preview.config.ts`, dane `node tools/phone-preview/seed.mjs`, kontrola `node tools/phone-preview/check-ui.mjs`; wymaga emulatorów Auth/Firestore według `firebase.telephony-test.json` i lokalnego Chrome. Używa fikcyjnych rekordów i blokuje połączenia przeglądarki poza localhost oraz CDN stylów. Kontrola zapisu, kolejnej rozmowy, PDF, archiwum, szerokości 1440/768/390/320 px, Bazy/Kolejki i uprawnień personelu.
 
 Automatyczne raporty na produkcji będzie można potwierdzić dopiero po wdrożeniu. Lokalna weryfikacja nie zastępuje sprawdzenia IAM i harmonogramu w GCP.
+
+Wdrożenie24.09: konto/rola utworzone skryptem tools/provision-telephony.sh, bez kluczy. Harmonogram utworzony przez Firebase w us-central1 (ustawienie projektu), funkcja europe-west1 i baza eur3; job nie zawiera danych kontaktów. Kill-switch: `gcloud scheduler jobs pause firebase-schedule-phoneReportsScheduled-europe-west1 --project myway-crm-a4593 --location us-central1`. Ostrzeżenie CLI o cleanup policy nie oznacza błędu funkcji; nie włączano kasowania obrazów we współdzielonym repozytorium.

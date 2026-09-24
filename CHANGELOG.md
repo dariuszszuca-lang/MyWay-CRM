@@ -1,3 +1,11 @@
+## 2026-09-24 — Telefony i dostęp Darka do statystyk
+
+Kod dbd43ae + e775743: dziennik kontaktów/rozmów, analiza, CSV/PDF, raporty na żądanie i automaty tygodnia/miesiąca/roku. Menu w osobnym rzędzie. Na jawne polecenie Darka konto dariusz.szuca@gmail.com otrzymuje dostęp do statystyk i finansów telefonów; pozostałe uprawnienia bez zmian. 60 testów aplikacji, 7 integracyjnych i build PASS. Poprzedni commit produkcyjny d252335; kopia poprzednich reguł zgodna z baseline, ruleset91a44df6-e70c-46b4-a3cf-1f7cbdc81276.
+
+Backend: phoneReportsScheduled ACTIVE w europe-west1, Node22, dedykowany SA i custom role z 4 uprawnieniami dokumentów bez delete, ograniczone IAM do bazy domyślnej. Pierwszy przebieg24.09 09:06UTC utworzył3raporty, statusok. Funkcje istniejące nie były wdrażane. Firebase utworzył job w us-central1 zgodnie z konfiguracją schedulera projektu; job niesie wyłącznie sygnał PubSub, obliczenia w europe-west1, baza w eur3. Codziennie00:30Europe/Warsaw. CLI zakończyło ostrzeżeniem o braku cleanup policy artefaktów po udanym wdrożeniu; bez włączania automatycznego kasowania we współdzielonym repozytorium obrazów.
+
+Bez importu historii, wysyłek i zmian danych pacjentów. AI_ACT_CHECK NIE_DOTYCZY: deterministyczna analiza. Frontend: publikacja po potwierdzeniu backendu.
+
 ## 2026-09-23 — dostęp zespołu według listy Darka
 
 Dodano Waldka, Stanisława, Patrycję i Małgosię do aplikacji i reguł Firestore, bez statystyk. Natalia Pucz zachowuje pełny dostęp ze statystykami. Te same cztery konta są dodawane do ORDERS_ALLOWED_EMAILS funkcji ordersApi (Dziennik), z zachowaniem istniejących sześciu kont i pozostałej konfiguracji. Adresy zweryfikowane z przekazanym zrzutem. 50 testów aplikacji i build PASS; Rules API: 180 przypadków przed i 180 po zmianie PASS, również odmowy dla kont obcych i niezweryfikowanych. Bez zmian danych pacjentów. Rollback: commit aadad43 i ruleset d0674eba-65de-44c1-bf16-34595d595ba9.
