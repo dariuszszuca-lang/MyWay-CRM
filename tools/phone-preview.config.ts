@@ -7,7 +7,7 @@ export default defineConfig({
   resolve: {
     alias: [
       {
-        find: /^\.{1,2}\/firebaseConfig$/,
+        find: /^(?:\.{1,2}\/)+firebaseConfig$/,
         replacement: path.resolve("tools/phone-preview/firebase.ts"),
       },
     ],
