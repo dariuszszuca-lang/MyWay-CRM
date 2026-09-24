@@ -118,7 +118,7 @@ export function validateContact(c) {
   if (c.stage && !STAGES.includes(c.stage)) e.push("Wybierz etap kontaktu.");
   if (c.closedDate && (!validDate(c.closedDate) || c.closedDate < c.firstDate))
     e.push("Data zamknięcia nie może poprzedzać pierwszego kontaktu.");
-  if (c.stage === "Wygrany" && !c.closedDate)
+  if (c.stage === "Wygrany" && !c.closedDate && !c.historical)
     e.push("Dla wygranej podaj datę zamknięcia.");
   if (c.nextDate && !validDate(c.nextDate))
     e.push("Nieprawidłowy termin kolejnej rozmowy.");
@@ -303,6 +303,8 @@ export function summarize(
     ),
     missingDurations,
     invalidFirstTimes: fresh.filter((c) => !validTime(c.firstTime)).length,
+    historicalContacts: fresh.filter((c) => c.historical).length,
+    wonWithoutDate: fresh.filter((c) => c.stage === "Wygrany" && !validDate(c.closedDate)).length,
     invalidCallTimes: attempts.filter((c) => !validTime(c.time)).length,
     overdue: cs.filter((c) => followupActive(c) && c.nextDate < asOf).length,
     dueToday: cs.filter((c) => followupActive(c) && c.nextDate === asOf).length,
@@ -330,6 +332,10 @@ export function summarize(
   ];
   if (summary.nfzShare !== null)
     insights.push(`Kontakty NFZ: ${summary.nfzShare}% nowych kontaktów.`);
+  if (summary.historicalContacts)
+    insights.push(`${summary.historicalContacts} kontaktów pochodzi z importu historii. Dawna liczba kontaktów i czas nie są osobnymi wpisami rozmów.`);
+  if (summary.wonWithoutDate)
+    insights.push(`${summary.wonWithoutDate} historycznych wygranych kontaktów nie ma poprawnej daty zamknięcia. Nie są doliczane do wygranych ani kwot w okresie.`);
   if (missingDurations)
     insights.push(
       `${missingDurations} prób bez czasu rozmowy. Wydajność godzin z brakami nie jest wyliczana.`,

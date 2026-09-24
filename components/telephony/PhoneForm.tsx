@@ -410,11 +410,16 @@ export default function PhoneForm({
               potwierdzeniem wpłaty.
             </p>
             {c.historical && (
-              <p className="text-sm text-amber-800 mt-3">
+              <div className="text-sm text-amber-800 mt-3 space-y-2">
+                <p>
                 Dane historyczne. Dawny czas: {c.historicalDuration || "brak"},
                 liczba kontaktów: {c.historicalCount || "brak"}. Termin wymaga
                 potwierdzenia.
-              </p>
+                </p>
+                <p>Godzina źródłowa: {c.historicalFirstTime || "brak"}. Zamknięcie źródłowe: {c.historicalClosedAt || "brak"}. Follow-up źródłowy: {c.historicalFollowupAt || "brak"}.</p>
+                {c.stage === "Wygrany" && !c.closedDate && <p>Brak poprawnej daty zamknięcia. Uzupełnij ją po sprawdzeniu — do tego czasu wygrana nie wchodzi do wyników okresowych.</p>}
+                {c.historicalExtraNotes && <p className="whitespace-pre-wrap">{c.historicalExtraNotes}</p>}
+              </div>
             )}
           </details>
         </fieldset>

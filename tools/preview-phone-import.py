@@ -4,8 +4,8 @@ import argparse,csv,datetime,hashlib,io,json,pathlib,re,collections,os
 
 def date(value):
     value=value.strip()
-    if not re.fullmatch(r'\d{1,2}[.\-]\d{1,2}[.\-]\d{4}',value):return ''
-    try:return datetime.datetime.strptime(re.sub(r'[.\-]','.',value),'%d.%m.%Y').date().isoformat()
+    if not re.fullmatch(r'\d{1,2}[.\-]\d{1,2}[.\-]\d{4}(?: \d{1,2}:\d{2})?',value):return ''
+    try:return datetime.datetime.strptime(re.sub(r'[.\-]','.',value.split(' ')[0]),'%d.%m.%Y').date().isoformat()
     except ValueError:return ''
 
 def preview(source):
@@ -29,13 +29,15 @@ def preview(source):
                 if value<0 or value>10000000:raise ValueError()
                 amount=value
             except ValueError:issues.append('unparsed_amount')
+        if closed and closed < date(r[0]):
+            closed='';issues.append('close_date_before_first_contact')
         if stage=='Wygrany' and not closed:issues.append('won_without_close_date')
         if r[11]:issues.append('historical_duration_not_converted')
         if r[16]:issues.append('historical_followup_needs_confirmation')
         category={'Indywidulane':'Terapia indywidualna','<18 lat':'Poniżej 18 lat','Inne forma terapi':'Inna forma terapii'}.get(r[4],r[4])
         source_name={'MAIL':'Mail','POLECENIE':'Polecenie','FB':'Facebook','OFERTEO':'Oferteo'}.get(r[7],r[7])
         status={'BRAK DECYZJI':'Brak decyzji','FOLLOW UP':'Follow-up','ODPADA':'Odpada','ZADATEK':'Zadatek','REZERWACJA':'Rezerwacja','NIEAKTULANE':'Nieaktualne','BRAK KONTAKTU':'Brak kontaktu'}.get(r[12],r[12])
-        c=dict(id=id,label=r[1],phone=r[17],firstDate=date(r[0]),firstTime=time,category=category,quality=quality,temperature=r[6],source=source_name,stage=stage,province=r[10],status=status,closedDate=closed,lossReason=r[15],nextDate='',nextTime='',followupStatus=r[18],note=r[19],followupNote=r[20],owner='',revision=0,historical=True,followupConfirmed=False,historicalCount=r[9],historicalDuration=r[11])
+        c=dict(id=id,label=r[1],phone=r[17],firstDate=date(r[0]),firstTime=time,category=category,quality=quality,temperature=r[6],source=source_name,stage=stage,province=r[10],status=status,closedDate=closed,lossReason=r[15],nextDate='',nextTime='',followupStatus=r[18],note=r[19],followupNote=r[20],owner='',revision=0,historical=True,followupConfirmed=False,historicalCount=r[9],historicalDuration=r[11],historicalFirstTime=r[2],historicalClosedAt=r[13],historicalFollowupAt=r[16],historicalExtraNotes='')
         result.append({'contact':c,'financial':{'amount':amount},'sourceRow':n,'source':dict(zip(rows[0],row)),'warnings':issues})
         warnings.update(issues)
     dates=[x['contact']['firstDate'] for x in result]

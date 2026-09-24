@@ -177,3 +177,19 @@ test('harmonogram tworzy raporty w emulatorze i nie duplikuje po ponowieniu',asy
   assert.equal((await db.collection('phoneReportState').doc('scheduler').get()).data().status,'ok');
  }finally{await app.delete();}
 });
+
+test("historia bez daty zamknięcia daje się poprawić; personel nie może tworzyć fałszywego importu", async () => {
+  const db = dbFor(manager);
+  const legacy = {...contact(), historical: true, stage: 'Wygrany', revision: 1, createdBy: 'import:test', createdAt: new Date(), updatedBy: 'import:test', updatedAt: new Date()};
+  delete legacy.id;
+  await env.withSecurityRulesDisabled(async ctx => {
+    const rawDb = ctx.firestore();
+    await setDoc(doc(rawDb, 'phoneContacts', 'legacy'), legacy);
+    await setDoc(doc(rawDb, 'phoneImportSources', 'source'), {content: 'source data'});
+  });
+  await savePhoneContactIn(db,manager,{...legacy,id:'legacy',note:'Poprawiona notatka'},null,undefined);
+  assert.equal((await getDoc(doc(db,'phoneContacts','legacy'))).data().revision,2);
+  await assertSucceeds(getDocs(collection(db,'phoneImportSources')));
+  await assertFails(getDocs(collection(dbFor(staff),'phoneImportSources')));
+  await assertFails(savePhoneContactIn(db,manager,{...contact(),historical:true},null,undefined));
+});

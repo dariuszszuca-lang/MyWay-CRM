@@ -39,6 +39,10 @@ export interface PhoneContact {
   followupConfirmed?: boolean;
   historicalCount?: string;
   historicalDuration?: string;
+  historicalFirstTime?: string;
+  historicalClosedAt?: string;
+  historicalFollowupAt?: string;
+  historicalExtraNotes?: string;
   updatedBy?: string;
   updatedAt?: any;
   createdBy?: string;

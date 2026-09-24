@@ -31,6 +31,7 @@ import PhoneForm, {
   Select,
 } from "./telephony/PhoneForm";
 import PhoneAnalysis from "./telephony/PhoneAnalysis";
+import ImportedSources from "./telephony/ImportedSources";
 import { PhoneCallList, PhoneContactList } from "./telephony/PhoneLists";
 import { exportPhoneCsv, exportPhonePdf } from "../services/telephonyExport";
 
@@ -250,6 +251,15 @@ export function TelefonyView({
             setNotice(call ? "Rozmowa zapisana." : "Kontakt zaktualizowany.");
           }}
         />
+      )}
+      {data.contacts.some(c => c.historical) && (
+        <div className="p-3 rounded-lg bg-teal-50 text-teal-900 text-sm flex flex-wrap items-center gap-3">
+          <span>Historia z importu: {data.contacts.filter(c => c.historical).length} kontaktów. Pełna lista jest w Kontaktach; rozmowy wpisywane od teraz trafiają do Dziennika.</span>
+          {canStats && <button className="underline font-medium" onClick={() => {
+            const dates = data.contacts.filter(c => c.historical).map(c => c.firstDate).sort();
+            setPeriod("custom"); setCustom({from: dates[0], to: dates[dates.length - 1]}); setFilters({}); setSelectedReport(null); setTab("Analiza");
+          }}>Pokaż analizę importu</button>}
+        </div>
       )}
       <section
         className="bg-white border border-gray-200 rounded-xl p-4 space-y-4"
@@ -584,6 +594,7 @@ export function TelefonyView({
               <PhoneAnalysis summary={selectedReport.summary} />
             </>
           )}
+          <ImportedSources />
         </div>
       )}
     </div>

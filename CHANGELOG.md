@@ -1,3 +1,7 @@
+## 2026-09-24 — import historii telefonów, przygotowanie
+
+Na jawne polecenie Darka: import725 kontaktów ze wszystkich7załączników,7uzupełnień Ads,9źródeł w archiwum i5raportów. Skrypt create-only z prywatną kopią stanu i kontrolą ponowień, bez nadpisywania danych. Obsługa brakujących dat historycznych wygranych i zachowanie surowych wartości. Szczegóły w docs/telefony-import.md. Produkcyjny import następuje po wdrożeniu zgodnych reguł i UI.
+
 ## 2026-09-24 — Telefony i dostęp Darka do statystyk
 
 Kod dbd43ae + e775743: dziennik kontaktów/rozmów, analiza, CSV/PDF, raporty na żądanie i automaty tygodnia/miesiąca/roku. Menu w osobnym rzędzie. Na jawne polecenie Darka konto dariusz.szuca@gmail.com otrzymuje dostęp do statystyk i finansów telefonów; pozostałe uprawnienia bez zmian. 60 testów aplikacji, 7 integracyjnych i build PASS. Poprzedni commit produkcyjny d252335; kopia poprzednich reguł zgodna z baseline, ruleset91a44df6-e70c-46b4-a3cf-1f7cbdc81276.

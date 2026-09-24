@@ -35,3 +35,5 @@ service-account*.json
 # Local browser verification
 playwright-report/
 test-results/
+__pycache__/
+*.pyc

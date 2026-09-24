@@ -56,7 +56,7 @@ service cloud.firestore {
     function phoneDate(s) { return s is string && s.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'); }
     function phoneTime(s) { return s is string && s.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$'); }
     function phoneContactValid(d) {
-      return d.keys().hasOnly(['label','phone','firstDate','firstTime','category','quality','temperature','source','stage','province','status','closedDate','lossReason','nextDate','nextTime','followupStatus','note','followupNote','owner','revision','historical','historicalCount','historicalDuration','followupConfirmed','updatedBy','updatedAt','createdBy','createdAt'])
+      return d.keys().hasOnly(['label','phone','firstDate','firstTime','category','quality','temperature','source','stage','province','status','closedDate','lossReason','nextDate','nextTime','followupStatus','note','followupNote','owner','revision','historical','historicalCount','historicalDuration','historicalFirstTime','historicalClosedAt','historicalFollowupAt','historicalExtraNotes','followupConfirmed','updatedBy','updatedAt','createdBy','createdAt'])
         && shortText(d.label) && d.label.size() > 0 && shortText(d.phone)
         && phoneDate(d.firstDate) && (d.firstTime == '' || phoneTime(d.firstTime))
         && shortText(d.category) && d.quality in ['', 'A', 'B', 'C', 'D']
@@ -64,13 +64,15 @@ service cloud.firestore {
         && d.stage in ['Nowy', 'W kontakcie', 'Wygrany', 'Przegrany']
         && shortText(d.status) && shortText(d.lossReason) && shortText(d.owner)
         && (d.closedDate == '' || (phoneDate(d.closedDate) && d.closedDate >= d.firstDate))
-        && (d.stage != 'Wygrany' || d.closedDate != '')
+        && (d.stage != 'Wygrany' || d.closedDate != '' || d.get('historical', false))
         && (d.nextDate == '' || phoneDate(d.nextDate))
         && (d.nextTime == '' || (d.nextDate != '' && phoneTime(d.nextTime)))
         && shortText(d.followupStatus)
         && d.note is string && d.note.size() <= 4000
         && d.followupNote is string && d.followupNote.size() <= 4000
         && d.get('historical', false) is bool && d.get('followupConfirmed', false) is bool
+        && shortText(d.get('historicalFirstTime', '')) && shortText(d.get('historicalClosedAt', '')) && shortText(d.get('historicalFollowupAt', ''))
+        && d.get('historicalExtraNotes', '') is string && d.get('historicalExtraNotes', '').size() <= 4000
         && shortText(d.get('historicalCount', '')) && shortText(d.get('historicalDuration', ''))
         && d.revision is int && d.revision > 0
         && d.updatedBy == request.auth.uid && d.updatedAt == request.time;
@@ -83,10 +85,12 @@ service cloud.firestore {
     match /phoneContacts/{id} {
       allow read: if czlonekZespolu();
       allow create: if czlonekZespolu() && phoneContactValid(request.resource.data)
+        && !request.resource.data.get('historical', false)
         && request.resource.data.revision == 1
         && request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time
         && phoneHasAudit(id, 1);
       allow update: if czlonekZespolu() && phoneContactValid(request.resource.data)
+        && request.resource.data.get('historical', false) == resource.data.get('historical', false)
         && request.resource.data.revision == resource.data.revision + 1
         && request.resource.data.createdBy == resource.data.createdBy
         && request.resource.data.createdAt == resource.data.createdAt
@@ -150,6 +154,14 @@ service cloud.firestore {
         && request.resource.data.generatedAt is string && request.resource.data.automatic == false
         && request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time;
       allow update, delete: if false;
+    }
+    match /phoneImportSources/{id} {
+      allow read: if phoneStats();
+      allow write: if false;
+    }
+    match /phoneImportRuns/{id} {
+      allow read: if phoneStats();
+      allow write: if false;
     }
     match /phoneReportState/{id} {
       allow read: if phoneStats();
