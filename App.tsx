@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Patient, QueuePatient, getAmountDue, formatCurrency } from './types';
 import PatientForm from './components/PatientForm';
 import PatientList from './components/PatientList';
@@ -9,7 +9,8 @@ import StatsDashboard from './components/StatsDashboard';
 import RoomsTab from './components/RoomsTab';
 import ReportsTab from './components/ReportsTab';
 import DziennikTab from './components/DziennikTab';
-import { Activity, Users, Download, Cloud, RefreshCw, LogOut, Clock, BarChart3, AlertTriangle, BedDouble, FileText, Package } from 'lucide-react';
+const TelefonyTab = lazy(() => import('./components/TelefonyTab'));
+import { Activity, Users, Download, Cloud, RefreshCw, LogOut, Clock, BarChart3, AlertTriangle, BedDouble, FileText, Package, Phone } from 'lucide-react';
 import { db, auth } from './firebaseConfig';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, getDocs, where } from 'firebase/firestore';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
@@ -18,7 +19,7 @@ import { closeAssignment, syncAssignmentsToPatientEndDate } from './services/roo
 import { buildDischargeUpdatePayload, DischargeUpdateInput } from './services/dischargeUpdate';
 import { canAccessApp, canAccessStats } from './services/accessControl';
 
-type ActiveTab = 'form' | 'list' | 'queue' | 'stats' | 'rooms' | 'reports' | 'dziennik';
+type ActiveTab = 'form' | 'list' | 'queue' | 'stats' | 'rooms' | 'reports' | 'dziennik' | 'telefony';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -506,34 +507,20 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* Navigation Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 h-auto py-3 md:h-16 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="bg-teal-600 p-1.5 rounded-lg">
-              <Activity className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900 tracking-tight">MyWay CRM</h1>
-              <div className="flex items-center gap-1">
-                <Cloud className="w-3 h-3 text-green-500" />
-                <p className="text-xs text-green-600 font-medium">Online: {user.email}</p>
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex items-center justify-between gap-3 py-3 border-b border-gray-100">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="bg-teal-600 p-1.5 rounded-lg shrink-0"><Activity className="w-6 h-6 text-white" /></div>
+              <div className="min-w-0"><h1 className="text-lg sm:text-xl font-bold text-gray-900 tracking-tight">MyWay CRM</h1>
+                <div className="flex items-center gap-1 min-w-0"><Cloud className="w-3 h-3 text-green-500 shrink-0" /><p className="text-xs text-green-700 truncate">{user.email}</p></div>
               </div>
             </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 md:gap-4">
-            {/* Database Controls */}
-            <div className="flex items-center gap-2 mr-2 md:border-r md:pr-4 border-gray-200">
-              <button
-                onClick={handleExport}
-                className="flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-teal-700 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded transition-colors"
-                title="Pobierz kopię zapasową bazy danych"
-              >
-                <Download className="w-4 h-4" />
-                <span className="hidden sm:inline">Kopia</span>
-              </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button onClick={handleExport} className="min-h-[44px] p-3 flex items-center gap-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg" title="Pobierz kopię bazy pacjentów" aria-label="Pobierz kopię bazy pacjentów"><Download className="w-4 h-4" /><span className="hidden sm:inline">Kopia</span></button>
+              <button onClick={handleLogout} className="min-h-[44px] p-3 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg" title="Wyloguj się" aria-label="Wyloguj się"><LogOut className="w-4 h-4" /></button>
             </div>
-
-            <nav className="flex gap-2">
+          </div>
+            <nav aria-label="Menu główne" className="flex flex-wrap gap-1 py-2 [&_button]:min-h-[44px] [&_button]:whitespace-nowrap [&_button]:focus-visible:ring-2 [&_button]:focus-visible:ring-teal-600">
               <button
                 onClick={() => switchTab('form')}
                 className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
@@ -623,14 +610,12 @@ const App: React.FC = () => {
               </button>
 
               <button
-                onClick={handleLogout}
-                className="ml-2 px-3 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors flex items-center gap-1"
-                title="Wyloguj się"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
+                onClick={() => switchTab('telefony')}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
+                  activeTab === 'telefony' ? 'bg-teal-50 text-teal-700 border border-teal-200' : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              ><Phone className="w-4 h-4" />Telefony</button>
             </nav>
-          </div>
         </div>
       </header>
 
@@ -718,6 +703,12 @@ const App: React.FC = () => {
                 </div>
                 <PatientForm onSubmit={handleAddPatient} prefillFromQueue={prefillQueue || undefined} allPatients={patients} />
               </div>
+            )}
+
+            {activeTab === 'telefony' && (
+              <Suspense fallback={<p role="status" className="py-10 text-center text-gray-500">Wczytywanie telefonów…</p>}>
+                <TelefonyTab canStats={canViewStats} owner={user.displayName || user.email || ''} />
+              </Suspense>
             )}
 
             {activeTab === 'list' && (

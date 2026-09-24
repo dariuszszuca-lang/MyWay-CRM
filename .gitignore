@@ -27,3 +27,11 @@ dist-ssr
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+credentials.json
+service-account*.json
+
+# Local browser verification
+playwright-report/
+test-results/

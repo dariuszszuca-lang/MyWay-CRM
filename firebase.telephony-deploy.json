@@ -1,0 +1,9 @@
+{
+  "firestore": {"rules": "firestore.rules"},
+  "functions": {
+    "source": "functions/telephony",
+    "codebase": "telephony",
+    "runtime": "nodejs22",
+    "ignore": ["node_modules", "*.log"]
+  }
+}
