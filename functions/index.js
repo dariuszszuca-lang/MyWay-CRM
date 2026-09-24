@@ -132,6 +132,43 @@ async function sendNewsletterToContact(contactId, campaignId, subject, htmlConte
 // HTML EMAIL TEMPLATES
 // =======================================================================
 
+// Aplikacja MyWay (PWA): sekcja z kodem QR w mailu powitalnym i pożegnalnym (Krystian 24.09.2026)
+const APP_URL = "https://myway-app-d3b78.web.app";
+const APP_QR_IMG = "https://osrodek-myway.pl/aplikacja-myway-qr.png";
+
+function getAppSectionHtml(variant) {
+  const isFarewell = variant === "farewell";
+  const accent = isFarewell ? "#7c3aed" : "#0d9488";
+  const bg = isFarewell ? "#f5f3ff" : "#f0fdfa";
+  const border = isFarewell ? "#ddd6fe" : "#99f6e4";
+  const title = isFarewell ? "📱 Zabierz MyWay ze sobą" : "📱 Twoja aplikacja MyWay";
+  const intro = isFarewell
+    ? "Pobyt się kończy, ale trzeźwienie trwa dalej. Aplikacja zostaje z Tobą: licznik dni, dziennik emocji, ćwiczenia z ośrodka i przycisk SOS na trudną chwilę. Logujesz się tym samym e-mailem i hasłem, co w ośrodku."
+    : "Licznik trzeźwości, dziennik emocji, ćwiczenia i przycisk SOS na trudną chwilę. Będziemy z niej korzystać w trakcie pobytu, więc zainstaluj ją już teraz.";
+  return `
+    <div style="background:${bg};border:1px solid ${border};border-radius:8px;padding:20px;margin:24px 0;">
+      <h3 style="margin:0 0 12px;color:${accent};font-size:16px;">${title}</h3>
+      <table style="width:100%;border-collapse:collapse;">
+        <tr>
+          <td style="width:120px;vertical-align:top;padding-right:16px;">
+            <a href="${APP_URL}"><img src="${APP_QR_IMG}" alt="Kod QR do aplikacji MyWay" width="110" height="110" style="display:block;width:110px;height:110px;border:1px solid ${border};border-radius:6px;background:#ffffff;"></a>
+          </td>
+          <td style="vertical-align:top;font-size:14px;color:#555;line-height:1.6;">
+            <p style="margin:0 0 10px;">${intro}</p>
+            <p style="margin:0 0 12px;">Zeskanuj kod telefonem albo kliknij przycisk. Na iPhonie otwórz w Safari i wybierz „Dodaj do ekranu początkowego", na Androidzie w Chrome „Zainstaluj aplikację".</p>
+            <a href="${APP_URL}" style="display:inline-block;background:${accent};color:#ffffff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:14px;">Otwórz aplikację MyWay →</a>
+          </td>
+        </tr>
+      </table>
+    </div>`;
+}
+
+function getAppSectionPlain(variant) {
+  return variant === "farewell"
+    ? `\nZabierz MyWay ze sobą:\nAplikacja MyWay zostaje z Tobą (licznik dni, dziennik emocji, ćwiczenia, przycisk SOS): ${APP_URL}\nLogujesz się tym samym e-mailem i hasłem, co w ośrodku. iPhone: Safari i „Dodaj do ekranu początkowego". Android: Chrome i „Zainstaluj aplikację".\n`
+    : `\nTwoja aplikacja MyWay:\nLicznik trzeźwości, dziennik emocji, ćwiczenia i przycisk SOS. Zainstaluj już teraz: ${APP_URL}\niPhone: Safari i „Dodaj do ekranu początkowego". Android: Chrome i „Zainstaluj aplikację".\n`;
+}
+
 function getWelcomeEmailHtml(firstName, packageType, startDate, endDate, detoksPackage) {
   const packageNames = {
     "1": "Pakiet 1 — Podstawowy (28 dni)",
@@ -217,6 +254,8 @@ function getWelcomeEmailHtml(firstName, packageType, startDate, endDate, detoksP
     </div>
     ` : ""}
 
+    ${getAppSectionHtml("welcome")}
+
     <div style="background:#f8fafc;border-radius:8px;padding:20px;margin:24px 0;text-align:center;">
       <p style="font-size:15px;color:#555;margin:0 0 8px;">Masz pytania? Dzwoń śmiało:</p>
       <p style="margin:0;"><a href="tel:+48731395295" style="font-size:20px;color:#0d9488;font-weight:bold;text-decoration:none;">📞 731 395 295</a></p>
@@ -283,7 +322,7 @@ function getWelcomeEmailPlain(firstName, packageType, startDate, detoksPackage) 
     : detoksPackage === "3days"
       ? "\nUsługa dodatkowa: Detoks 3 dni (2 700 zł) — przed rozpoczęciem terapii.\n"
       : "";
-  return `Cześć ${firstName}!\n\nPotwierdzamy Twój termin w Ośrodku My Way.\n\nWariant terapii: ${packageName}\n${startDate ? `Data przyjazdu: ${startDate}\n` : ""}${detoksLine}\nCo spakować:\n- Środki higieny osobistej\n- Ręcznik\n- Ubrania na min. 7 dni\n- Strój sportowy\n- Obuwie + klapki\n- Kurtka\n- Laptop i telefon\n- Dowód osobisty\n- Ulubione lub aktualnie czytane książki\n- Leki i suplementy (zapas + dawkowanie, przekaż terapeucie)\n- Papierosy (dostęp do sklepu ograniczony regulaminem)\n${(packageType === "3" || packageType === "6tyg_roz" || packageType === "8tyg_roz") ? `\nBonus w Twoim pakiecie:\nTwój pakiet zawiera dodatkowe konsultacje indywidualne (online lub na miejscu).\n` : ""}\nMasz pytania? Dzwoń: 731 395 295\n\nDo zobaczenia!\nEkipa My Way\nosrodek-myway.pl`;
+  return `Cześć ${firstName}!\n\nPotwierdzamy Twój termin w Ośrodku My Way.\n\nWariant terapii: ${packageName}\n${startDate ? `Data przyjazdu: ${startDate}\n` : ""}${detoksLine}\nCo spakować:\n- Środki higieny osobistej\n- Ręcznik\n- Ubrania na min. 7 dni\n- Strój sportowy\n- Obuwie + klapki\n- Kurtka\n- Laptop i telefon\n- Dowód osobisty\n- Ulubione lub aktualnie czytane książki\n- Leki i suplementy (zapas + dawkowanie, przekaż terapeucie)\n- Papierosy (dostęp do sklepu ograniczony regulaminem)\n${(packageType === "3" || packageType === "6tyg_roz" || packageType === "8tyg_roz") ? `\nBonus w Twoim pakiecie:\nTwój pakiet zawiera dodatkowe konsultacje indywidualne (online lub na miejscu).\n` : ""}${getAppSectionPlain("welcome")}\nMasz pytania? Dzwoń: 731 395 295\n\nDo zobaczenia!\nEkipa My Way\nosrodek-myway.pl`;
 }
 
 function getFarewellEmailHtml(firstName, packageType) {
@@ -331,6 +370,8 @@ function getFarewellEmailHtml(firstName, packageType) {
       </table>
     </div>
 
+    ${getAppSectionHtml("farewell")}
+
     <div style="text-align:center;margin:24px 0;">
       <p style="font-size:15px;color:#555;margin:0 0 12px;">📖 Nasza książka — dla Ciebie i Twoich bliskich:</p>
       <a href="https://wygrajtrzezwezycie.pl" style="display:inline-block;background:#7c3aed;color:#ffffff;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px;">Wygraj Trzeźwe Życie →</a>
@@ -366,7 +407,7 @@ function getFarewellEmailHtml(firstName, packageType) {
 
 function getFarewellEmailPlain(firstName, packageType) {
   const isPackage3 = packageType === "3" || packageType === "6tyg_roz" || packageType === "8tyg_roz";
-  return `Cześć ${firstName}!\n\nGratulacje — właśnie domykasz ważny rozdział!\n\nCo dalej:\n${isPackage3 ? "- 20 spotkań indywidualnych (online lub na miejscu)\n" : ""}- Grupa VIP z Krystianem Nagabą\n\nZostań z nami:\n- Zjazdy absolwentów — co sobotę 10:00-13:00 w ośrodku\n- Grupa na WhatsApp — nasza przestrzeń 24/7\n- Platforma edukacyjna: https://edu-myway.pl\n- Live z Krystianem — na naszych social mediach\n\nKsiążka: https://wygrajtrzezwezycie.pl\n\nGdyby działo się coś trudnego — dzwoń:\n536 598 821\n731 395 295\n\nŚciskamy!\nEkipa My Way\nosrodek-myway.pl`;
+  return `Cześć ${firstName}!\n\nGratulacje — właśnie domykasz ważny rozdział!\n\nCo dalej:\n${isPackage3 ? "- 20 spotkań indywidualnych (online lub na miejscu)\n" : ""}- Grupa VIP z Krystianem Nagabą\n\nZostań z nami:\n- Zjazdy absolwentów — co sobotę 10:00-13:00 w ośrodku\n- Grupa na WhatsApp — nasza przestrzeń 24/7\n- Platforma edukacyjna: https://edu-myway.pl\n- Live z Krystianem — na naszych social mediach\n${getAppSectionPlain("farewell")}\nKsiążka: https://wygrajtrzezwezycie.pl\n\nGdyby działo się coś trudnego — dzwoń:\n536 598 821\n731 395 295\n\nŚciskamy!\nEkipa My Way\nosrodek-myway.pl`;
 }
 
 // =======================================================================
