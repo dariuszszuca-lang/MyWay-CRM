@@ -966,7 +966,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                 <th className="p-3 font-semibold text-gray-700 min-w-[150px]">Kontakt</th>
                 <th className="p-3 font-semibold text-gray-700 min-w-[140px]">Terapia / Pakiet</th>
                 <th className="p-3 font-semibold text-gray-700 min-w-[220px]">Dodatkowe</th>
-                <th className="p-3 font-semibold text-gray-700 min-w-[200px]">Uwagi</th>
+                <th className="p-3 font-semibold text-gray-700 w-[184px] min-w-[184px] max-w-[184px]">Uwagi</th>
                 <th className="p-3 font-semibold text-gray-700 text-right min-w-[180px]">Dokumenty</th>
               </tr>
             </thead>
@@ -1111,11 +1111,11 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                     </div>
                   </td>
 
-                  {/* Uwagi */}
-                  <td className="p-3 align-top">
-                    <div className="rounded-lg border border-gray-200 bg-yellow-50 p-3">
-                      <p className="line-clamp-4 whitespace-pre-wrap break-words text-sm leading-6 text-gray-800">{patient.notes || 'Brak uwag.'}</p>
-                      <button type="button" onClick={() => setNotesPatient(patient)} className="mt-2 inline-flex min-h-[44px] items-center gap-2 text-sm font-semibold text-teal-700 hover:text-teal-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-600">
+                  {/* Uwagi — stała szerokość podglądu, pełna treść w panelu */}
+                  <td className="w-[184px] min-w-[184px] max-w-[184px] p-3 align-top">
+                    <div className="w-[160px]">
+                      <p className="line-clamp-2 whitespace-pre-wrap break-words text-sm leading-5 text-gray-500">{patient.notes || 'Brak uwag.'}</p>
+                      <button type="button" onClick={() => setNotesPatient(patient)} className="mt-1 inline-flex min-h-[44px] items-center gap-1.5 whitespace-nowrap text-sm font-medium text-teal-700 hover:text-teal-900 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-600">
                         Otwórz uwagi <ArrowRight className="h-4 w-4" />
                       </button>
                     </div>

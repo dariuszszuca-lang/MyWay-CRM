@@ -1,3 +1,7 @@
+## 2026-09-24 — węższy podgląd uwag
+
+Kolumna Uwagi ma stałe 184 px, dwie linie szarego podglądu i mały link do panelu. Usunięto żółte tło i obramowanie podglądu. Wyłącznie zmiana prezentacji, bez zmiany treści lub mechanizmu zapisu. Build PASS; rzeczywisty PatientList z syntetyczną długą notatką: szerokość 184 px, dwie linie, cała treść w panelu, zero błędów JS. AI_ACT_CHECK NIE_DOTYCZY: korekta układu zwykłego edytora.
+
 ## 2026-09-24 — czytelne uwagi w Bazie
 
 W kolumnie Uwagi: podgląd czterech linii i przycisk „Otwórz uwagi”. Edycja w panelu z prawej strony (600 px, pełny ekran na telefonie), jawny zapis/anulowanie, ostrzeżenie przed utratą zmian. Zapis transakcyjny aktualizuje wyłącznie notes i odmawia nadpisania uwag zmienionych równolegle; błąd zachowuje tekst. Bez migracji i zmian innych pól pacjentów. Kontrola w Chrome na danych syntetycznych: zapis, ponowne otwarcie, anulowanie, Escape, ochrona zmian, błąd zapisu i układ 1440/390 px PASS, zero błędów JS. Build PASS.
