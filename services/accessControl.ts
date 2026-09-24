@@ -12,6 +12,7 @@ export const ALLOWED_EMAILS = [
 ];
 
 export const STATS_ACCESS_EMAILS = [
+  'dariusz.szuca@gmail.com',
   'mywaymarcin@gmail.com',
   'npucz708@gmail.com',
   'krystiannagaba@gmail.com',

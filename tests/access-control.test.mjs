@@ -28,3 +28,8 @@ test('nowy zespół ma CRM bez statystyk, Natalia pełny dostęp', () => {
  assert.equal(canAccessApp('Npucz708@gmail.com'), true);
  assert.equal(canAccessStats('Npucz708@gmail.com'), true);
 });
+
+test('Darek has statistics access including normalized email', () => {
+ assert.equal(canAccessStats('dariusz.szuca@gmail.com'), true);
+ assert.equal(canAccessStats(' DARIUSZ.SZUCA@GMAIL.COM '), true);
+});

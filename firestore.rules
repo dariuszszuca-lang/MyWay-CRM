@@ -49,7 +49,7 @@ service cloud.firestore {
     // Phone module. Financial amounts and report archives have a narrower audience.
     function phoneStats() {
       return czlonekZespolu() && request.auth.token.email.lower() in [
-        'mywaymarcin@gmail.com', 'npucz708@gmail.com', 'krystiannagaba@gmail.com'
+        'dariusz.szuca@gmail.com', 'mywaymarcin@gmail.com', 'npucz708@gmail.com', 'krystiannagaba@gmail.com'
       ];
     }
     function shortText(s) { return s is string && s.size() <= 120; }

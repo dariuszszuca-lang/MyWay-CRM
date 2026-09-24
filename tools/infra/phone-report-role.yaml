@@ -1,0 +1,8 @@
+title: MyWay Phone Reports
+description: Read contacts and write aggregate phone reports; no deletion.
+stage: GA
+includedPermissions:
+  - datastore.entities.get
+  - datastore.entities.list
+  - datastore.entities.create
+  - datastore.entities.update

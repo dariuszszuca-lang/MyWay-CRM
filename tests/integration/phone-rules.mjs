@@ -106,6 +106,15 @@ test("kwoty są zapisywane i czytane tylko przez osoby ze statystykami", async (
     /brak dostępu/,
   );
 });
+test("Darek ma dostęp do raportów i kwot, personel nadal bez dostępu", async () => {
+  const owner = { uid: "owner", email: "dariusz.szuca@gmail.com" };
+  const db = dbFor(owner);
+  const id = await savePhoneContactIn(db, owner, contact(), call(), 500);
+  assert.equal((await getDoc(doc(db, "phoneFinancials", id))).data().amount, 500);
+  await assertSucceeds(getDocs(collection(db, "phoneReports")));
+  await assertSucceeds(getDocs(collection(db, "phoneReportState")));
+  await assertFails(getDocs(collection(dbFor(staff), "phoneReports")));
+});
 test("obce konto, brak logowania i niezweryfikowany email nie mają dostępu", async () => {
   for (const db of [
     env.unauthenticatedContext().firestore(),
