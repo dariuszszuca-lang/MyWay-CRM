@@ -4,6 +4,7 @@ import { FileText, User, ScrollText, MessageCircle, CheckSquare, Square, Pencil,
 import { generateContract, generatePatientCard, generateRegulations, generateFilteredListPDF } from '../services/pdfGenerator';
 import PatientForm from './PatientForm';
 import DischargeDocuments from './DischargeDocuments';
+import PatientNotesPanel from './PatientNotesPanel';
 
 interface DischargeData {
   dischargeType: 'completed' | 'resignation' | 'referral' | 'conditional_break' | 'expelled';
@@ -19,16 +20,18 @@ interface DischargeData {
 interface PatientListProps {
   patients: Patient[];
   onUpdatePatient: (patient: Patient) => void;
+  onSaveNotes: (id: string, notes: string, originalNotes: string) => Promise<void>;
   onDeletePatient: (id: string) => void;
   onDischargePatient: (patient: Patient, dischargeData: DischargeData) => void;
   onReactivatePatient: (patient: Patient) => void;
   onUpdateDischarge: (patient: Patient, dischargeData: DischargeData) => void;
 }
 
-const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, onDeletePatient, onDischargePatient, onReactivatePatient, onUpdateDischarge }) => {
+const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, onSaveNotes, onDeletePatient, onDischargePatient, onReactivatePatient, onUpdateDischarge }) => {
   const [filterPackage, setFilterPackage] = useState<'all' | '1' | '2' | '3' | '6tyg' | '8tyg' | '6tyg_roz' | '8tyg_roz' | 'interwencyjna' | 'vip'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'discharged' | 'interrupted'>('active');
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
+  const [notesPatient, setNotesPatient] = useState<Patient | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Discharge modal state
@@ -1110,12 +1113,12 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
 
                   {/* Uwagi */}
                   <td className="p-3 align-top">
-                    <textarea
-                      value={patient.notes}
-                      onChange={(e) => onUpdatePatient({ ...patient, notes: e.target.value })}
-                      placeholder="Wpisz uwagi..."
-                      className="w-full h-24 p-2 text-xs border border-gray-200 rounded bg-yellow-50 focus:bg-white focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none resize-none transition-colors"
-                    />
+                    <div className="rounded-lg border border-gray-200 bg-yellow-50 p-3">
+                      <p className="line-clamp-4 whitespace-pre-wrap break-words text-sm leading-6 text-gray-800">{patient.notes || 'Brak uwag.'}</p>
+                      <button type="button" onClick={() => setNotesPatient(patient)} className="mt-2 inline-flex min-h-[44px] items-center gap-2 text-sm font-semibold text-teal-700 hover:text-teal-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-600">
+                        Otwórz uwagi <ArrowRight className="h-4 w-4" />
+                      </button>
+                    </div>
                   </td>
 
                   {/* Dokumenty */}
@@ -1183,6 +1186,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
           </table>
         </div>
       </div>
+      {notesPatient && <PatientNotesPanel patient={notesPatient} onSave={onSaveNotes} onClose={() => setNotesPatient(null)} />}
     </div>
   );
 };

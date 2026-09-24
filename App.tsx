@@ -12,7 +12,7 @@ import DziennikTab from './components/DziennikTab';
 const TelefonyTab = lazy(() => import('./components/TelefonyTab'));
 import { Activity, Users, Download, Cloud, RefreshCw, LogOut, Clock, BarChart3, AlertTriangle, BedDouble, FileText, Package, Phone } from 'lucide-react';
 import { db, auth } from './firebaseConfig';
-import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, getDocs, where } from 'firebase/firestore';
+import { runTransaction, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, getDocs, where } from 'firebase/firestore';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { sendWelcomeEmail, confirmPatientEmail, dischargePatientEmail } from './services/getResponseService';
 import { closeAssignment, syncAssignmentsToPatientEndDate } from './services/roomsService';
@@ -202,6 +202,18 @@ const App: React.FC = () => {
       alert("Błąd podczas dodawania pacjenta do chmury.");
       console.error(err);
     }
+  };
+
+  const handleSavePatientNotes = async (id: string, notes: string, originalNotes: string) => {
+    await runTransaction(db, async transaction => {
+      const patientRef = doc(db, 'patients', id);
+      const snapshot = await transaction.get(patientRef);
+      if (!snapshot.exists()) throw new Error('Pacjent nie jest już dostępny.');
+      if ((snapshot.data().notes || '') !== originalNotes) {
+        throw new Error('Uwagi zostały zmienione przez inną osobę. Skopiuj swój tekst, zamknij panel i otwórz aktualne uwagi.');
+      }
+      transaction.update(patientRef, { notes });
+    });
   };
 
   const handleUpdatePatient = async (updatedPatient: Patient) => {
@@ -729,6 +741,7 @@ const App: React.FC = () => {
                 <PatientList
                   patients={patients}
                   onUpdatePatient={handleUpdatePatient}
+                  onSaveNotes={handleSavePatientNotes}
                   onDeletePatient={handleDeletePatient}
                   onDischargePatient={handleDischargePatient}
                   onReactivatePatient={handleReactivatePatient}

@@ -1,3 +1,9 @@
+## 2026-09-24 — czytelne uwagi w Bazie
+
+W kolumnie Uwagi: podgląd czterech linii i przycisk „Otwórz uwagi”. Edycja w panelu z prawej strony (600 px, pełny ekran na telefonie), jawny zapis/anulowanie, ostrzeżenie przed utratą zmian. Zapis transakcyjny aktualizuje wyłącznie notes i odmawia nadpisania uwag zmienionych równolegle; błąd zachowuje tekst. Bez migracji i zmian innych pól pacjentów. Kontrola w Chrome na danych syntetycznych: zapis, ponowne otwarcie, anulowanie, Escape, ochrona zmian, błąd zapisu i układ 1440/390 px PASS, zero błędów JS. Build PASS.
+
+AI_ACT_CHECK: NIE_DOTYCZY — zwykły edytor tekstu bez funkcji AI; oznaczenia i rejestr nie dotyczą.
+
 ## 2026-09-24 — import historii telefonów, zakończony
 
 Na jawne polecenie Darka: import725 kontaktów ze wszystkich7załączników,7uzupełnień Ads,9źródeł w archiwum i5raportów. Skrypt create-only z prywatną kopią stanu i kontrolą ponowień, bez nadpisywania danych. Obsługa brakujących dat historycznych wygranych i zachowanie surowych wartości. Szczegóły w docs/telefony-import.md. Import zakończony24.09 09:30UTC; wszystkie725rekordów i48kwot odczytano i porównano.9źródeł i5raportów dostępnych. Ponowny plan nie tworzy duplikatów. Kodd630adc/16f8c60, VercelSUCCESS,HTTP200,71testów i kontroleUI PASS. Dane pacjentów i wcześniejsze raporty bez zmian.
