@@ -1,6 +1,6 @@
-## 2026-09-24 — import historii telefonów, przygotowanie
+## 2026-09-24 — import historii telefonów, zakończony
 
-Na jawne polecenie Darka: import725 kontaktów ze wszystkich7załączników,7uzupełnień Ads,9źródeł w archiwum i5raportów. Skrypt create-only z prywatną kopią stanu i kontrolą ponowień, bez nadpisywania danych. Obsługa brakujących dat historycznych wygranych i zachowanie surowych wartości. Szczegóły w docs/telefony-import.md. Produkcyjny import następuje po wdrożeniu zgodnych reguł i UI.
+Na jawne polecenie Darka: import725 kontaktów ze wszystkich7załączników,7uzupełnień Ads,9źródeł w archiwum i5raportów. Skrypt create-only z prywatną kopią stanu i kontrolą ponowień, bez nadpisywania danych. Obsługa brakujących dat historycznych wygranych i zachowanie surowych wartości. Szczegóły w docs/telefony-import.md. Import zakończony24.09 09:30UTC; wszystkie725rekordów i48kwot odczytano i porównano.9źródeł i5raportów dostępnych. Ponowny plan nie tworzy duplikatów. Kodd630adc/16f8c60, VercelSUCCESS,HTTP200,71testów i kontroleUI PASS. Dane pacjentów i wcześniejsze raporty bez zmian.
 
 ## 2026-09-24 — Telefony i dostęp Darka do statystyk
 

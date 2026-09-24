@@ -16,3 +16,9 @@ Poprawiono parser dat zamknięcia zawierających godzinę. Po pełnym odczycie:5
 Importer zachowuje manifest7plików oraz9archiwalnych tabel/tekstów. Dodatkowo tworzy4 raporty miesięczne oraz1 raport pełnego zakresu, z wyraźną informacją o danych historycznych. Nie zmienia wcześniej utworzonych raportów ani danych pacjentów. Rollback nie kasuje automatycznie danych: manifest wskazuje dokładne nowe ID; ewentualne usunięcie wymaga osobnego potwierdzenia i sprawdzenia późniejszych edycji.
 
 Weryfikacja:62testy aplikacji,8reguł/uprawnień i1integracyjny test importu na syntetycznych danych w lokalnym emulatorze, w tym atomowość konfliktu, idempotencja i ochrona edycji po imporcie. Build oraz UI sprawdzane przed publikacją. Reguły nowych archiwów read-only dla grupy statystyk. AI_ACT_CHECK NIE_DOTYCZY: deterministyczny import i obliczenia.
+
+## Odbiór produkcji24.09.2026,09:30UTC
+
+Import `marcin-252866fb99e8c797` zakończony. Odczytano i porównano wszystkie pola725kontaktów,48kwot i9archiwów ze źródłem. Dokładnie7kontaktów ma uzupełnienieAds. Istniejące3raporty niezmienione, dodano5historycznych. Ponowny plan:0do utworzenia,725już zaimportowanych. Dziennik nowych rozmów pozostaje pusty — nie generowano fikcyjnych prób z sumarycznej historii. Liczby nowych kontaktów według miesięcy: kwiecień167,maj202,czerwiec166,lipiec190. Wygrane z datą45;5wygranych bez poprawnej daty oznaczonych jako brak danych.
+
+Frontend16f8c60: VercelSUCCESS,HTTP200, assetyindex-DyTjOSc6.js iTelefonyTab-DoKhYrDW.js identyczne z buildem. Reguły produkcyjne zgodne z lokalnie testowanym plikiem. Harmonogram po aktualizacji i imporcie wykonał się poprawnie09:30:58UTC,0duplikatów. Pełna kontrola UI (desktop/mobile,zapis,uprawnienia,PDF) oraz osobny test edycji historii/zakresu importu/pobrania źródłowegoCSV PASS.
