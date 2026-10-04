@@ -4,11 +4,14 @@ import type { AdditionalServiceType } from '../types';
 import { PlusCircle, Calculator, Save, X, Trash2, Search, UserCheck, Stethoscope } from 'lucide-react';
 
 interface PatientFormProps {
-  onSubmit: (patient: Patient) => void;
+  // Zwraca false, gdy zapis się nie udał (formularz zostaje wypełniony).
+  onSubmit: (patient: Patient) => void | boolean | Promise<void | boolean>;
   initialData?: Patient;
   onCancel?: () => void;
   prefillFromQueue?: QueuePatient;
   allPatients?: Patient[];
+  // AWS: pełna karta wracającego pacjenta pobierana z serwera po wyborze.
+  onLoadFullPatient?: (id: string) => Promise<Patient>;
 }
 
 const defaultPatient: Omit<Patient, 'id'> = {
@@ -35,7 +38,7 @@ const defaultPatient: Omit<Patient, 'id'> = {
   notes: ''
 };
 
-const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCancel, prefillFromQueue, allPatients }) => {
+const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCancel, prefillFromQueue, allPatients, onLoadFullPatient }) => {
   const [formData, setFormData] = useState<Omit<Patient, 'id'> | Patient>(defaultPatient);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [services, setServices] = useState<AdditionalService[]>([]);
@@ -72,7 +75,12 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSelectReturning = (patient: Patient) => {
+  const handleSelectReturning = async (wybrany: Patient) => {
+    // Wiersz listy nie ma dowodu, adresu ani e-maila: pobieramy pełną kartę (z wpisem w dzienniku).
+    let patient = wybrany;
+    if (onLoadFullPatient) {
+      try { patient = await onLoadFullPatient(wybrany.id); } catch (err) { alert(`Nie udało się pobrać karty pacjenta. ${(err as Error).message}`); return; }
+    }
     const previousStay = patient.treatmentStartDate && patient.treatmentEndDate
       ? `Pobyt ponowny — poprzedni: ${patient.treatmentStartDate} – ${patient.treatmentEndDate}`
       : 'Pobyt ponowny';
@@ -212,7 +220,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
 
   const totalServices = services.reduce((sum, s) => sum + (s.amount || 0), 0);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // If editing (initialData exists), use existing ID, otherwise generate new
@@ -224,8 +232,9 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
       id: initialData?.id || crypto.randomUUID()
     };
 
-    onSubmit(patientToSave);
-    
+    // AWS: czekamy na wynik zapisu. Przy błędzie formularz zostaje wypełniony, bez komunikatu o sukcesie.
+    if ((await onSubmit(patientToSave)) === false) return;
+
     if (!initialData) {
         setFormData(defaultPatient);
         alert("Pacjent został dodany do bazy.");

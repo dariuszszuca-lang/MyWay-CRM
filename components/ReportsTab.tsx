@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Patient, QueuePatient, Room, RoomAssignment } from '../types';
-import { db } from '../firebaseConfig';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { usePokoje } from '../services/roomsService';
 import PatientsInResidenceReport from './PatientsInResidenceReport';
 import AdmissionsReport from './AdmissionsReport';
 import DischargesReport from './DischargesReport';
@@ -15,25 +14,9 @@ interface Props {
 type SubTab = 'residence' | 'admissions' | 'discharges';
 
 const ReportsTab: React.FC<Props> = ({ patients, queue = [] }) => {
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [assignments, setAssignments] = useState<RoomAssignment[]>([]);
+  // AWS: pokoje i przydziały z API, odświeżane co 20 s i po każdej zmianie.
+  const { rooms, assignments } = usePokoje();
   const [subTab, setSubTab] = useState<SubTab>('residence');
-
-  useEffect(() => {
-    const qRooms = query(collection(db, 'rooms'));
-    const unsubRooms = onSnapshot(qRooms, snap => {
-      setRooms(snap.docs.map(d => ({ ...(d.data() as Omit<Room, 'id'>), id: d.id })));
-    });
-    return () => unsubRooms();
-  }, []);
-
-  useEffect(() => {
-    const qA = query(collection(db, 'roomAssignments'), orderBy('createdAt', 'desc'));
-    const unsubA = onSnapshot(qA, snap => {
-      setAssignments(snap.docs.map(d => ({ ...(d.data() as Omit<RoomAssignment, 'id'>), id: d.id })));
-    });
-    return () => unsubA();
-  }, []);
 
   const tabBtn = (id: SubTab, label: string, Icon: any) => (
     <button

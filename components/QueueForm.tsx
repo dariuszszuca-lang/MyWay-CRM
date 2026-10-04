@@ -7,6 +7,8 @@ interface QueueFormProps {
   initialData?: QueuePatient;
   onCancel?: () => void;
   allPatients?: Patient[];
+  // AWS: pełna karta wracającego pacjenta (dowód, adres, e-mail) pobierana z serwera po wyborze.
+  onLoadFullPatient?: (id: string) => Promise<Patient>;
 }
 
 const defaultQueue: Omit<QueuePatient, 'id'> = {
@@ -32,7 +34,7 @@ const defaultQueue: Omit<QueuePatient, 'id'> = {
   status: 'waiting'
 };
 
-const QueueForm: React.FC<QueueFormProps> = ({ onSubmit, initialData, onCancel, allPatients = [] }) => {
+const QueueForm: React.FC<QueueFormProps> = ({ onSubmit, initialData, onCancel, allPatients = [], onLoadFullPatient }) => {
   const [formData, setFormData] = useState<Omit<QueuePatient, 'id'> | QueuePatient>(defaultQueue);
   const [returningSearch, setReturningSearch] = useState('');
   const [showResults, setShowResults] = useState(false);
@@ -82,7 +84,12 @@ const QueueForm: React.FC<QueueFormProps> = ({ onSubmit, initialData, onCancel, 
     }).slice(0, 8);
   }, [returningSearch, allPatients]);
 
-  const pickReturning = (p: Patient) => {
+  const pickReturning = async (wybrany: Patient) => {
+    // Wiersz listy nie ma dowodu, adresu ani e-maila: pobieramy pełną kartę (z wpisem w dzienniku).
+    let p = wybrany;
+    if (onLoadFullPatient) {
+      try { p = await onLoadFullPatient(wybrany.id); } catch (err) { alert(`Nie udało się pobrać karty pacjenta. ${(err as Error).message}`); return; }
+    }
     setFormData(prev => ({
       ...prev,
       firstName: p.firstName,

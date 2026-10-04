@@ -1,5 +1,5 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { Patient, QueuePatient, getAmountDue, formatCurrency } from './types';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Patient, QueuePatient, Payment, getAmountDue, formatCurrency } from './types';
 import PatientForm from './components/PatientForm';
 import PatientList from './components/PatientList';
 import QueueForm from './components/QueueForm';
@@ -8,21 +8,23 @@ import Login from './components/Login';
 import StatsDashboard from './components/StatsDashboard';
 import RoomsTab from './components/RoomsTab';
 import ReportsTab from './components/ReportsTab';
-import DziennikTab from './components/DziennikTab';
-const TelefonyTab = lazy(() => import('./components/TelefonyTab'));
-import { Activity, Users, Download, Cloud, RefreshCw, LogOut, Clock, BarChart3, AlertTriangle, BedDouble, FileText, Package, Phone } from 'lucide-react';
-import { db, auth } from './firebaseConfig';
-import { runTransaction, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, getDocs, where } from 'firebase/firestore';
-import { onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { sendWelcomeEmail, confirmPatientEmail, dischargePatientEmail } from './services/getResponseService';
-import { closeAssignment, syncAssignmentsToPatientEndDate } from './services/roomsService';
-import { buildDischargeUpdatePayload, DischargeUpdateInput } from './services/dischargeUpdate';
-import { canAccessApp, canAccessStats } from './services/accessControl';
+import { Activity, Users, Cloud, RefreshCw, LogOut, Clock, BarChart3, AlertTriangle, BedDouble, FileText } from 'lucide-react';
+import { Sesja, sesja as pobierzSesje, wyloguj } from './services/aws/auth';
+import { nasluchuj, ustawObslugeWygasniecia } from './services/aws/api';
+import { AWS_CONFIG } from './services/aws/config';
+import {
+  DaneWypisu, dodajDoKolejki, dodajPacjenta, dodajWplate, pobierzKarteKolejki, pobierzKolejke, pobierzPacjentow, pobierzPelnego,
+  przywroc, usunPacjenta, usunZKolejki, wypisz, zapiszKolejke, zapiszNotatki, zapiszPacjenta, zmienWypis,
+} from './services/aws/dane';
 
-type ActiveTab = 'form' | 'list' | 'queue' | 'stats' | 'rooms' | 'reports' | 'dziennik' | 'telefony';
+// Gałąź aws: dane i logowanie na koncie AWS MyWay (Frankfurt). Na podglądzie WYŁĄCZONE są:
+// maile do pacjentów i listy GetResponse (Etap 2), Telefony, Dziennik zamówień.
+type ActiveTab = 'form' | 'list' | 'queue' | 'stats' | 'rooms' | 'reports';
+
+const komunikat = (e: unknown) => (e instanceof Error ? e.message : 'Nieznany błąd.');
 
 const App: React.FC = () => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<Sesja | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [permissionError, setPermissionError] = useState<string | null>(null);
 
@@ -36,460 +38,197 @@ const App: React.FC = () => {
   const [prefillQueue, setPrefillQueue] = useState<QueuePatient | null>(null);
   const [admittingQueueId, setAdmittingQueueId] = useState<string | null>(null);
 
-  // 1. Auth check
+  // 1. Sesja: przy starcie sprawdzamy, czy w tej karcie jest ważne logowanie.
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (currentUser) {
-        const userEmail = currentUser.email?.toLowerCase() || '';
-        const isAllowed = canAccessApp(userEmail);
-        if (isAllowed) {
-          setUser(currentUser);
-          setPermissionError(null);
-        } else {
-          signOut(auth);
-          setUser(null);
-          setPermissionError(`Brak dostępu dla adresu: ${userEmail}. Skontaktuj się z administratorem.`);
-        }
-      } else {
-        setUser(null);
-      }
-      setAuthLoading(false);
-    });
-    return () => unsubscribe();
+    ustawObslugeWygasniecia(() => { setUser(null); setPermissionError('Sesja wygasła. Zaloguj się ponownie.'); });
+    pobierzSesje().then((s) => { setUser(s); setAuthLoading(false); });
   }, []);
 
-  // 2. Load patients from Firebase
+  const wczytajPacjentow = useCallback(async () => {
+    try {
+      setPatients(await pobierzPacjentow());
+      setError(null);
+    } catch (e) {
+      setError(`Problem z pobraniem danych. ${komunikat(e)}`);
+    }
+  }, []);
+
+  const wczytajKolejke = useCallback(async () => {
+    try {
+      setQueue(await pobierzKolejke());
+    } catch (e) {
+      console.error('Błąd kolejki:', komunikat(e));
+    }
+  }, []);
+
+  // 2. Dane: wczytanie po zalogowaniu, odświeżanie co 20 s i od razu po każdym zapisie (decyzja D3).
   useEffect(() => {
     if (!user) {
       setPatients([]);
-      return;
-    }
-
-    setDataLoading(true);
-    const q = query(collection(db, "patients"), orderBy("lastName"));
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const patientsData: Patient[] = snapshot.docs.map(doc => ({
-        ...doc.data() as Omit<Patient, 'id'>,
-        id: doc.id
-      }));
-      setPatients(patientsData);
-      setDataLoading(false);
-      setError(null);
-    }, (err) => {
-      console.error("Błąd połączenia z bazą:", err);
-      if (user) {
-        setError("Problem z pobraniem danych.");
-      }
-      setDataLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [user]);
-
-  // 3. Load queue from Firebase
-  useEffect(() => {
-    if (!user) {
       setQueue([]);
       return;
     }
-
-    const q = query(collection(db, "queue"), orderBy("createdAt"));
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const queueData: QueuePatient[] = snapshot.docs.map(doc => ({
-        ...doc.data() as Omit<QueuePatient, 'id'>,
-        id: doc.id
-      }));
-      setQueue(queueData);
-    }, (err) => {
-      console.error("Błąd kolejki:", err);
-    });
-
-    return () => unsubscribe();
-  }, [user]);
+    setDataLoading(true);
+    Promise.all([wczytajPacjentow(), wczytajKolejke()]).finally(() => setDataLoading(false));
+    const odlaczP = nasluchuj('pacjenci', wczytajPacjentow);
+    const odlaczK = nasluchuj('kolejka', wczytajKolejke);
+    const zegar = window.setInterval(() => { wczytajPacjentow(); wczytajKolejke(); }, AWS_CONFIG.odswiezanieMs);
+    return () => { odlaczP(); odlaczK(); window.clearInterval(zegar); };
+  }, [user, wczytajPacjentow, wczytajKolejke]);
 
   // --- PATIENT CRUD ---
   const handleAddPatient = async (patientData: Patient) => {
     try {
-      const { id, ...dataToSave } = patientData;
-      const docRef = await addDoc(collection(db, "patients"), dataToSave);
-
-      // Notify
-      try {
-        await fetch('https://europe-west1-myway-point-app.cloudfunctions.net/notifyNewPatient', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            firstName: patientData.firstName,
-            lastName: patientData.lastName,
-            email: patientData.email,
-            phone: patientData.phone,
-            package: patientData.package
-          })
-        });
-      } catch (notifyError) {
-        console.warn('⚠️ Nie udało się wysłać powiadomienia:', notifyError);
-      }
-
-      // GetResponse welcome email
-      const emailSent = await sendWelcomeEmail({
-        email: patientData.email,
-        firstName: patientData.firstName,
-        lastName: patientData.lastName,
-        package: patientData.package,
-        phone: patientData.phone
-      });
-      if (!emailSent) {
-        console.warn('⚠️ Nie udało się dodać pacjenta do GetResponse');
-      }
-
-      // Package 3 → MyWayPoint sync
-      if (patientData.package === '3') {
-        try {
-          const response = await fetch(
-            'https://europe-west1-myway-point-app.cloudfunctions.net/createPatientFromCRM',
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                firstName: patientData.firstName,
-                lastName: patientData.lastName,
-                email: patientData.email,
-                phone: patientData.phone,
-                totalSessions: 20,
-                crmPatientId: docRef.id
-              })
-            }
-          );
-          if (!response.ok) {
-            console.error('MyWayPoint sync error:', await response.text());
-          }
-        } catch (syncError) {
-          console.error('MyWayPoint sync failed:', syncError);
-        }
-      }
-
-      // If admitting from queue, migrate room reservations + remove from queue
-      if (admittingQueueId) {
-        try {
-          // Najpierw przepisz wszystkie rezerwacje pokoju z queuePatientId na nowy patientId.
-          // Bez tego assignment zostałby sierotą — queue patient zaraz znika, a w bazie
-          // wisi assignment wskazujący na nieistniejący queue id (Plan tygodnia → "?").
-          const reservationsSnap = await getDocs(query(
-            collection(db, "roomAssignments"),
-            where("queuePatientId", "==", admittingQueueId)
-          ));
-          for (const resDoc of reservationsSnap.docs) {
-            await updateDoc(doc(db, "roomAssignments", resDoc.id), {
-              patientId: docRef.id,
-            });
-          }
-        } catch (migErr) {
-          console.warn('Migracja rezerwacji pokoju z kolejki nie powiodła się:', migErr);
-        }
-        try {
-          await deleteDoc(doc(db, "queue", admittingQueueId));
-        } catch (err) {
-          console.warn('Nie udało się usunąć z kolejki:', err);
-        }
-        setAdmittingQueueId(null);
-        setPrefillQueue(null);
-      }
-
+      const zKolejki = admittingQueueId ? queue.find((q) => q.id === admittingQueueId) || prefillQueue || undefined : undefined;
+      await dodajPacjenta(patientData, zKolejki || undefined);
+      // Powiadomienia, mail powitalny i synchronizacja z MyWayPoint zostają w obecnym systemie (Etap 2).
+      setAdmittingQueueId(null);
+      setPrefillQueue(null);
       setActiveTab('list');
+      return true;
     } catch (err) {
-      alert("Błąd podczas dodawania pacjenta do chmury.");
-      console.error(err);
+      alert(`Błąd podczas dodawania pacjenta. ${komunikat(err)}`);
+      return false;
     }
   };
 
-  const handleSavePatientNotes = async (id: string, notes: string, originalNotes: string) => {
-    await runTransaction(db, async transaction => {
-      const patientRef = doc(db, 'patients', id);
-      const snapshot = await transaction.get(patientRef);
-      if (!snapshot.exists()) throw new Error('Pacjent nie jest już dostępny.');
-      if ((snapshot.data().notes || '') !== originalNotes) {
-        throw new Error('Uwagi zostały zmienione przez inną osobę. Skopiuj swój tekst, zamknij panel i otwórz aktualne uwagi.');
-      }
-      transaction.update(patientRef, { notes });
-    });
-  };
+  const handleSavePatientNotes = (id: string, notes: string, originalNotes: string) => zapiszNotatki(id, notes, originalNotes);
 
   const handleUpdatePatient = async (updatedPatient: Patient) => {
     try {
-      // Zapamiętaj starą datę końca przed updateDoc (do propagacji do przypisań)
-      const previousPatient = patients.find(p => p.id === updatedPatient.id);
-      const oldEndDate = previousPatient?.treatmentEndDate;
-
-      const patientRef = doc(db, "patients", updatedPatient.id);
-      const { id, ...dataToUpdate } = updatedPatient;
-      await updateDoc(patientRef, dataToUpdate);
-
-      // Auto-sync: jeśli zmieniono treatmentEndDate, zaktualizuj toDate w aktywnych
-      // przypisaniach pokoju (tylko te zsynchronizowane wcześniej; open-ended, historyczne
-      // i ręcznie zmienione zostają nietknięte). Błąd tu nie blokuje zapisu pacjenta.
-      if (oldEndDate && oldEndDate !== updatedPatient.treatmentEndDate) {
-        try {
-          const updated = await syncAssignmentsToPatientEndDate({
-            patientId: updatedPatient.id,
-            oldEndDate,
-            newEndDate: updatedPatient.treatmentEndDate,
-          });
-          if (updated > 0) {
-            console.log(`✓ Zsynchronizowano ${updated} przypisanie/a pokoju z nową datą końca terapii`);
-          }
-        } catch (syncErr) {
-          console.warn('Nie udało się zsynchronizować przypisań pokoju:', syncErr);
-        }
-      }
+      const wynik = await zapiszPacjenta(updatedPatient);
+      if (wynik.ostrzezenie) alert(wynik.ostrzezenie);
     } catch (err) {
-      alert("Błąd podczas aktualizacji danych.");
-      console.error(err);
+      alert(`Błąd podczas aktualizacji danych. ${komunikat(err)}`);
     }
   };
 
   const handleDeletePatient = async (id: string) => {
-    if (window.confirm('Czy na pewno chcesz usunąć tego pacjenta? Tej operacji nie można cofnąć.')) {
-      try {
-        await deleteDoc(doc(db, "patients", id));
-      } catch (err) {
-        alert("Błąd podczas usuwania pacjenta.");
-        console.error(err);
-      }
+    const powod = window.prompt('Usunięcie pacjenta. Rekord zostanie oznaczony jako usunięty, z Twoim kontem i datą.\n\nPodaj powód (co najmniej 5 znaków):');
+    if (powod === null) return;
+    if (powod.trim().length < 5) return alert('Podaj powód usunięcia (co najmniej 5 znaków).');
+    try {
+      await usunPacjenta(id, powod.trim());
+    } catch (err) {
+      alert(`Błąd podczas usuwania pacjenta. ${komunikat(err)}`);
+    }
+  };
+
+  // Pełna karta pacjenta (adres, e-mail, dowód, wpłaty i usługi). Serwer zapisuje to otwarcie w dzienniku.
+  const handleLoadFullPatient = (id: string) => pobierzPelnego(id);
+
+  const handleAddPayment = async (id: string, wplata: Payment) => {
+    try {
+      await dodajWplate(id, wplata);
+    } catch (err) {
+      alert(`Błąd podczas zapisu wpłaty. ${komunikat(err)}`);
     }
   };
 
   // --- QUEUE CRUD ---
-  // Firestore nie akceptuje undefined w polach — usuń je przed zapisem
-  const stripUndefined = <T extends Record<string, any>>(obj: T): Partial<T> => {
-    const out: Partial<T> = {};
-    for (const key in obj) {
-      if (obj[key] !== undefined) out[key] = obj[key];
-    }
-    return out;
-  };
-
   const handleAddToQueue = async (queuePatient: QueuePatient) => {
     try {
-      const { id, ...dataToSave } = queuePatient;
-      await addDoc(collection(db, "queue"), stripUndefined(dataToSave));
-      alert("Dodano do kolejki.");
+      await dodajDoKolejki(queuePatient);
+      alert('Dodano do kolejki.');
     } catch (err) {
-      alert("Błąd podczas dodawania do kolejki.");
-      console.error(err);
+      alert(`Błąd podczas dodawania do kolejki. ${komunikat(err)}`);
     }
   };
 
   const handleUpdateQueue = async (updated: QueuePatient) => {
     try {
-      const ref = doc(db, "queue", updated.id);
-      const { id, ...dataToUpdate } = updated;
-      await updateDoc(ref, stripUndefined(dataToUpdate));
+      await zapiszKolejke(updated);
     } catch (err) {
-      alert("Błąd podczas aktualizacji kolejki.");
-      console.error(err);
+      alert(`Błąd podczas aktualizacji kolejki. ${komunikat(err)}`);
     }
   };
 
   const handleDeleteQueue = async (id: string) => {
+    const powod = window.prompt('Usunięcie wpisu z kolejki. Wpis zostanie oznaczony jako usunięty.\n\nPodaj powód (co najmniej 5 znaków):');
+    if (powod === null) return;
+    if (powod.trim().length < 5) return alert('Podaj powód usunięcia (co najmniej 5 znaków).');
     try {
-      await deleteDoc(doc(db, "queue", id));
+      await usunZKolejki(id, powod.trim());
     } catch (err) {
-      alert("Błąd podczas usuwania z kolejki.");
-      console.error(err);
+      alert(`Błąd podczas usuwania z kolejki. ${komunikat(err)}`);
     }
   };
 
-  // Confirm patient in queue → send welcome email + add to GetResponse lists
+  // Potwierdzenie osoby w kolejce. Mail powitalny i listy GetResponse: na podglądzie AWS wyłączone (Etap 2).
   const handleConfirmQueuePatient = async (patient: QueuePatient) => {
     try {
-      // 1. Update status in Firestore
-      const ref = doc(db, "queue", patient.id);
-      await updateDoc(ref, { status: 'confirmed' });
-
-      // 2. Send welcome email + add to lists (if email exists)
-      if (patient.email) {
-        const result = await confirmPatientEmail({
-          email: patient.email,
-          firstName: patient.firstName,
-          lastName: patient.lastName,
-          package: patient.package,
-          phone: patient.phone,
-          startDate: patient.plannedStartDate,
-          endDate: patient.plannedEndDate,
-          detoksPackage: patient.detoksPackage,
-        });
-        if (result) {
-          alert(`✅ ${patient.firstName} potwierdzony! Mail powitalny wysłany + dodany do list GetResponse.`);
-        } else {
-          alert(`⚠️ ${patient.firstName} potwierdzony, ale wystąpił problem z mailem/listami.`);
-        }
-      } else {
-        alert(`✅ ${patient.firstName} potwierdzony (brak e-mail — mail nie wysłany).`);
-      }
+      await zapiszKolejke({ ...patient, status: 'confirmed' });
+      alert(`✅ ${patient.firstName} potwierdzony. Mail powitalny nie został wysłany (podgląd AWS, maile dojdą w Etapie 2).`);
     } catch (err) {
-      alert("Błąd podczas potwierdzania pacjenta.");
-      console.error(err);
+      alert(`Błąd podczas potwierdzania. ${komunikat(err)}`);
     }
   };
 
-  // Discharge patient → update status + optional farewell email
-  const handleDischargePatient = async (patient: Patient, dischargeData: {
-    dischargeType: 'completed' | 'resignation' | 'referral' | 'conditional_break' | 'expelled';
-    dischargeDate: string;
-    refundAmount?: number;
-    refundDate?: string;
-    conditionalReturnDate?: string;
-    dischargeNotes?: string;
-    authorizedBy?: 'Natalia' | 'Krystian';
-    authorizedNote?: string;
-  }) => {
+  // --- WYPIS ---
+  const handleDischargePatient = async (patient: Patient, dischargeData: DaneWypisu) => {
     try {
-      // 1. Build update payload
-      const updatePayload: Record<string, any> = {
-        status: 'discharged',
-        dischargeType: dischargeData.dischargeType,
-        dischargeDate: dischargeData.dischargeDate,
+      const r = await wypisz(patient.id, dischargeData);
+      const typeLabels: Record<string, string> = {
+        completed: 'Zakończenie terapii',
+        resignation: 'Rezygnacja z terapii',
+        referral: 'Skierowanie do opieki specjalistycznej',
+        conditional_break: 'Przerwa warunkowa',
+        expelled: 'Wydalony',
       };
-      if (dischargeData.refundAmount !== undefined && dischargeData.refundAmount > 0) {
-        updatePayload.refundAmount = dischargeData.refundAmount;
-      }
-      if (dischargeData.refundDate) {
-        updatePayload.refundDate = dischargeData.refundDate;
-      }
-      if (dischargeData.conditionalReturnDate) {
-        updatePayload.conditionalReturnDate = dischargeData.conditionalReturnDate;
-      }
-      if (dischargeData.dischargeNotes) {
-        updatePayload.dischargeNotes = dischargeData.dischargeNotes;
-      }
-      if (dischargeData.authorizedBy) {
-        updatePayload.dischargeAuthorizedBy = dischargeData.authorizedBy;
-      }
-      if (dischargeData.authorizedNote) {
-        updatePayload.dischargeAuthorizedNote = dischargeData.authorizedNote;
-      }
-
-      // 2. Update Firestore
-      const patientRef = doc(db, "patients", patient.id);
-      await updateDoc(patientRef, updatePayload);
-
-      // 2b. Auto-zwolnienie pokoju: zamknij aktywny RoomAssignment z toDate = dischargeDate.
-      // UWAGA: pobieramy WSZYSTKIE assignments pacjenta i filtrujemy client-side, bo
-      // aktualne przypisanie może mieć toDate=plannedEndDate w przyszłości (nie null).
-      // Try/catch — błąd tu nie blokuje wypisu (sam wypis już zapisany).
-      try {
-        const allAssignmentsSnap = await getDocs(query(
-          collection(db, "roomAssignments"),
-          where("patientId", "==", patient.id)
-        ));
-        for (const docSnap of allAssignmentsSnap.docs) {
-          const a = docSnap.data() as { toDate: string | null };
-          const isCurrent = a.toDate === null || a.toDate >= dischargeData.dischargeDate;
-          if (isCurrent) {
-            await closeAssignment(docSnap.id, dischargeData.dischargeDate);
-          }
-        }
-      } catch (roomErr) {
-        console.error("Nie udało się auto-zwolnić pokoju przy wypisie:", roomErr);
-      }
-
-      // 3. Send farewell email ONLY for completed therapy
-      if (dischargeData.dischargeType === 'completed' && patient.email) {
-        const result = await dischargePatientEmail({
-          email: patient.email,
-          firstName: patient.firstName,
-          package: patient.package,
-        });
-        if (result) {
-          alert(`✅ ${patient.firstName} wypisany (zakończenie terapii). Mail pożegnalny wysłany.`);
-        } else {
-          alert(`⚠️ ${patient.firstName} wypisany, ale problem z wysyłką maila.`);
-        }
-      } else {
-        const typeLabels: Record<string, string> = {
-          completed: 'Zakończenie terapii',
-          resignation: 'Rezygnacja z terapii',
-          referral: 'Skierowanie do opieki specjalistycznej',
-          conditional_break: 'Przerwa warunkowa',
-          expelled: 'Wydalony',
-        };
-        alert(`✅ ${patient.firstName} wypisany — ${typeLabels[dischargeData.dischargeType]}.`);
-      }
+      const pokoj = r.zwolnionePrzydzialy > 0 ? ' Pokój zwolniony.' : '';
+      alert(`✅ ${patient.firstName} wypisany: ${typeLabels[dischargeData.dischargeType]}.${pokoj}`);
     } catch (err) {
-      alert("Błąd podczas wypisywania pacjenta.");
-      console.error(err);
+      alert(`Nie udało się wypisać pacjenta. ${komunikat(err)}`);
     }
   };
 
-  // Zmiana zapisanego wypisu: tylko powód, daty, zwrot i uwagi. Bez zmiany statusu,
-  // bez ponownego zwalniania pokoju i bez ponownego maila pożegnalnego.
-  const handleUpdateDischarge = async (patient: Patient, dischargeData: DischargeUpdateInput) => {
+  // Zmiana zapisanego wypisu: tylko powód, daty, zwrot i uwagi. Bez zmiany statusu i pokoju.
+  const handleUpdateDischarge = async (patient: Patient, dischargeData: DaneWypisu) => {
     try {
-      await updateDoc(doc(db, "patients", patient.id), buildDischargeUpdatePayload(dischargeData));
+      await zmienWypis(patient.id, dischargeData);
       alert(`✅ Wypis ${patient.firstName} ${patient.lastName} zaktualizowany.`);
     } catch (err) {
-      alert("Błąd podczas zapisu zmian wypisu.");
-      console.error(err);
+      alert(`Błąd podczas zapisu zmian wypisu. ${komunikat(err)}`);
     }
   };
 
-  // Reactivate patient (e.g. return from conditional break)
+  // Przywrócenie do aktywnych (np. powrót z przerwy warunkowej). Dane wypisu przechodzą do historii.
   const handleReactivatePatient = async (patient: Patient) => {
     if (!window.confirm(`Czy na pewno chcesz przywrócić ${patient.firstName} ${patient.lastName} do aktywnych pacjentów?`)) {
       return;
     }
     try {
-      const patientRef = doc(db, "patients", patient.id);
-      await updateDoc(patientRef, {
-        status: 'active',
-        dischargeType: null,
-        dischargeDate: null,
-        refundAmount: null,
-        refundDate: null,
-        conditionalReturnDate: null,
-        dischargeNotes: null,
-      });
+      await przywroc(patient.id);
       alert(`✅ ${patient.firstName} ${patient.lastName} przywrócony do aktywnych pacjentów.`);
     } catch (err) {
-      alert("Błąd podczas przywracania pacjenta.");
-      console.error(err);
+      alert(`Błąd podczas przywracania pacjenta. ${komunikat(err)}`);
     }
   };
 
-  // Admit patient: queue → form with prefill
-  const handleAdmitPatient = (queuePatient: QueuePatient) => {
-    setPrefillQueue(queuePatient);
-    setAdmittingQueueId(queuePatient.id);
-    setActiveTab('form');
-  };
-
-  // Export
-  const handleExport = () => {
-    const dataStr = JSON.stringify(patients, null, 2);
-    const blob = new Blob([dataStr], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `kopia_bazy_myway_${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  // Przyjęcie z kolejki: pobieramy pełny wpis (PESEL, dowód, adres) i wypełniamy nim formularz.
+  const handleAdmitPatient = async (queuePatient: QueuePatient) => {
+    try {
+      setPrefillQueue(await pobierzKarteKolejki(queuePatient.id));
+      setAdmittingQueueId(queuePatient.id);
+      setActiveTab('form');
+    } catch (err) {
+      alert(`Nie udało się otworzyć wpisu z kolejki. ${komunikat(err)}`);
+    }
   };
 
   const handleLogout = () => {
-    if(window.confirm("Czy na pewno chcesz się wylogować?")) {
-      signOut(auth);
+    if (window.confirm('Czy na pewno chcesz się wylogować?')) {
+      wyloguj();
+      setUser(null);
     }
   };
 
-  // Cancel prefill when switching away from form
-  const canViewStats = canAccessStats(user?.email);
+  // Statystyki widzi tylko grupa „statystyki” (jak dotąd STATS_ACCESS_EMAILS). Serwer pilnuje tego niezależnie.
+  const canViewStats = Boolean(user?.grupy.includes('statystyki'));
 
   const switchTab = (tab: ActiveTab) => {
     if (tab === 'stats' && !canViewStats) {
-      setError("Brak uprawnień do statystyk.");
+      setError('Brak uprawnień do statystyk.');
       setActiveTab('form');
       return;
     }
@@ -512,7 +251,7 @@ const App: React.FC = () => {
   }
 
   if (!user) {
-    return <Login permissionError={permissionError} />;
+    return <Login permissionError={permissionError} onZalogowano={(s) => { setPermissionError(null); setUser(s); }} />;
   }
 
   return (
@@ -528,7 +267,6 @@ const App: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <button onClick={handleExport} className="min-h-[44px] p-3 flex items-center gap-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg" title="Pobierz kopię bazy pacjentów" aria-label="Pobierz kopię bazy pacjentów"><Download className="w-4 h-4" /><span className="hidden sm:inline">Kopia</span></button>
               <button onClick={handleLogout} className="min-h-[44px] p-3 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg" title="Wyloguj się" aria-label="Wyloguj się"><LogOut className="w-4 h-4" /></button>
             </div>
           </div>
@@ -608,25 +346,6 @@ const App: React.FC = () => {
                 <FileText className="w-4 h-4" />
                 Raporty
               </button>
-
-              <button
-                onClick={() => switchTab('dziennik')}
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
-                  activeTab === 'dziennik'
-                    ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <Package className="w-4 h-4" />
-                Dziennik
-              </button>
-
-              <button
-                onClick={() => switchTab('telefony')}
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
-                  activeTab === 'telefony' ? 'bg-teal-50 text-teal-700 border border-teal-200' : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              ><Phone className="w-4 h-4" />Telefony</button>
             </nav>
         </div>
       </header>
@@ -713,14 +432,8 @@ const App: React.FC = () => {
                     </button>
                   )}
                 </div>
-                <PatientForm onSubmit={handleAddPatient} prefillFromQueue={prefillQueue || undefined} allPatients={patients} />
+                <PatientForm onSubmit={handleAddPatient} prefillFromQueue={prefillQueue || undefined} allPatients={patients} onLoadFullPatient={handleLoadFullPatient} />
               </div>
-            )}
-
-            {activeTab === 'telefony' && (
-              <Suspense fallback={<p role="status" className="py-10 text-center text-gray-500">Wczytywanie telefonów…</p>}>
-                <TelefonyTab canStats={canViewStats} owner={user.displayName || user.email || ''} />
-              </Suspense>
             )}
 
             {activeTab === 'list' && (
@@ -746,6 +459,8 @@ const App: React.FC = () => {
                   onDischargePatient={handleDischargePatient}
                   onReactivatePatient={handleReactivatePatient}
                   onUpdateDischarge={handleUpdateDischarge}
+                  onLoadFullPatient={handleLoadFullPatient}
+                  onAddPayment={handleAddPayment}
                 />
               </div>
             )}
@@ -759,7 +474,7 @@ const App: React.FC = () => {
 
                 {/* Queue Add Form */}
                 <div className="mb-8">
-                  <QueueForm onSubmit={handleAddToQueue} allPatients={patients} />
+                  <QueueForm onSubmit={handleAddToQueue} allPatients={patients} onLoadFullPatient={handleLoadFullPatient} />
                 </div>
 
                 {/* Queue List */}
@@ -789,16 +504,6 @@ const App: React.FC = () => {
             {activeTab === 'reports' && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <ReportsTab patients={patients} queue={queue} />
-              </div>
-            )}
-
-            {activeTab === 'dziennik' && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="mb-6">
-                  <h2 className="text-2xl font-bold text-gray-800">Dziennik</h2>
-                  <p className="text-gray-500">Zamówienia ze sklepu edu-myway.pl i kody na darmowy Dziennik. Zmiana statusu wysyła maila do klienta.</p>
-                </div>
-                <DziennikTab />
               </div>
             )}
           </>

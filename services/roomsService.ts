@@ -1,118 +1,133 @@
-import { db } from '../firebaseConfig';
-import {
-  collection, doc, addDoc, updateDoc, deleteDoc, getDocs, writeBatch, query, where,
-} from 'firebase/firestore';
+// Pokoje i przydziały przez API na AWS (gałąź aws). Te same nazwy funkcji co wcześniej,
+// żeby komponenty pokoi nie wymagały zmian. Poprzednia wersja na Firestore: roomsService.firebase.ts.bak.
+import { useEffect, useState } from 'react';
 import { Room, RoomAssignment, ROOMS_SEED } from '../types';
+import { api, BladApi, nasluchuj, zmieniono } from './aws/api';
+import { AWS_CONFIG } from './aws/config';
+import { pokojDoApi, pokojZApi, przydzialZApi } from './aws/mapowanie';
 
-const ROOMS = 'rooms';
-const ASSIGNMENTS = 'roomAssignments';
+let pokojeCache: Room[] = [];
 
-const stripUndefined = <T extends Record<string, any>>(obj: T): Partial<T> => {
-  const out: Partial<T> = {};
-  for (const k in obj) if (obj[k] !== undefined) out[k] = obj[k];
-  return out;
-};
+export async function pobierzPokoje(): Promise<Room[]> {
+  pokojeCache = ((await api('GET', '/pokoje')).pokoje || []).map(pokojZApi);
+  return pokojeCache;
+}
+
+export async function pobierzPrzydzialy(): Promise<RoomAssignment[]> {
+  const lista: RoomAssignment[] = ((await api('GET', '/przydzialy')).przydzialy || []).map(przydzialZApi);
+  return lista.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+}
+
+// Pokoje i przydziały z odświeżaniem co 20 s i od razu po każdej zmianie (zamiast nasłuchu Firestore).
+export function usePokoje(): { rooms: Room[]; assignments: RoomAssignment[] } {
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [assignments, setAssignments] = useState<RoomAssignment[]>([]);
+  useEffect(() => {
+    let zywe = true;
+    const wczytaj = async () => {
+      try {
+        const [r, a] = await Promise.all([pobierzPokoje(), pobierzPrzydzialy()]);
+        if (zywe) { setRooms(r); setAssignments(a); }
+      } catch (e) {
+        console.error('Nie udało się pobrać pokoi:', (e as Error).message);
+      }
+    };
+    wczytaj();
+    const odlacz = nasluchuj('pokoje', wczytaj);
+    const zegar = window.setInterval(wczytaj, AWS_CONFIG.odswiezanieMs);
+    return () => { zywe = false; odlacz(); window.clearInterval(zegar); };
+  }, []);
+  return { rooms, assignments };
+}
 
 // --- ROOMS CRUD ---
 export async function createRoom(data: Omit<Room, 'id'>): Promise<string> {
-  const ref = await addDoc(collection(db, ROOMS), stripUndefined(data));
-  return ref.id;
+  const r = await api('POST', '/pokoje', pokojDoApi(data));
+  zmieniono('pokoje');
+  return r.id;
 }
 
 export async function updateRoom(id: string, data: Partial<Omit<Room, 'id'>>): Promise<void> {
-  await updateDoc(doc(db, ROOMS, id), stripUndefined(data) as any);
+  const obecny = pokojeCache.find((p) => p.id === id);
+  if (!obecny) throw new Error('Dane pokoi są nieaktualne. Odśwież i spróbuj ponownie.');
+  await api('PUT', `/pokoje/${id}`, { ...pokojDoApi(data), wersja: obecny.wersja });
+  zmieniono('pokoje');
 }
 
 export async function deleteRoom(id: string): Promise<void> {
-  await deleteDoc(doc(db, ROOMS, id));
+  await api('DELETE', `/pokoje/${id}`);
+  zmieniono('pokoje');
 }
 
 export async function seedRooms(): Promise<number> {
-  const snap = await getDocs(collection(db, ROOMS));
-  if (!snap.empty) return 0;
-  const batch = writeBatch(db);
-  for (const r of ROOMS_SEED) {
-    const ref = doc(collection(db, ROOMS));
-    batch.set(ref, stripUndefined(r));
-  }
-  await batch.commit();
+  if ((await pobierzPokoje()).length > 0) return 0;
+  for (const r of ROOMS_SEED) await api('POST', '/pokoje', pokojDoApi(r));
+  zmieniono('pokoje');
   return ROOMS_SEED.length;
 }
 
 // --- ASSIGNMENTS CRUD ---
+// Pełny pokój: serwer odmawia (409 pokoj-pelny) i podaje obłożenie. Dopiero wtedy pytamy o zgodę
+// i ponawiamy z jawnym potwierdzeniem, które serwer zapisuje w dzienniku jako przydział ponad limit.
+async function zPotwierdzeniemPelnego<T>(wyslij: (mimoPelnego: boolean) => Promise<T>): Promise<T> {
+  try {
+    return await wyslij(false);
+  } catch (e) {
+    if (e instanceof BladApi && e.kod === 'pokoj-pelny') {
+      if (window.confirm(`${e.message.replace(' Aby przypisać mimo to, potwierdź (mimoPelnego).', '')}\n\nMimo to przypisać?`)) return wyslij(true);
+      throw new Error('Anulowano: pokój jest pełny.');
+    }
+    throw e;
+  }
+}
+
+const przydzialDoApi = (d: Omit<RoomAssignment, 'id' | 'createdAt'> & { createdAt?: string }, mimoPelnego: boolean) => ({
+  ...(d.queuePatientId ? { kolejkaId: d.queuePatientId } : { pacjentId: d.patientId }),
+  pokojId: d.roomId,
+  odDaty: d.fromDate,
+  ...(d.toDate ? { doDaty: d.toDate } : {}),
+  ...(d.notes ? { notatki: d.notes } : {}),
+  ...(mimoPelnego ? { mimoPelnego: true } : {}),
+});
+
 export async function createAssignment(data: Omit<RoomAssignment, 'id'>): Promise<string> {
-  const ref = await addDoc(collection(db, ASSIGNMENTS), stripUndefined({
-    ...data,
-    createdAt: data.createdAt || new Date().toISOString(),
-  }));
-  return ref.id;
+  const r = await zPotwierdzeniemPelnego((m) => api('POST', '/przydzialy', przydzialDoApi(data, m)));
+  zmieniono('pokoje');
+  return r.id;
 }
 
 export async function updateAssignment(id: string, data: Partial<Omit<RoomAssignment, 'id'>>): Promise<void> {
-  await updateDoc(doc(db, ASSIGNMENTS, id), stripUndefined(data) as any);
+  const cialo: Record<string, unknown> = {};
+  if (data.fromDate !== undefined) cialo.odDaty = data.fromDate;
+  if (data.toDate !== undefined) cialo.doDaty = data.toDate || '';
+  if (data.notes !== undefined) cialo.notatki = data.notes || '';
+  await api('PUT', `/przydzialy/${id}`, cialo);
+  zmieniono('pokoje');
 }
 
 export async function deleteAssignment(id: string): Promise<void> {
-  await deleteDoc(doc(db, ASSIGNMENTS, id));
+  await api('DELETE', `/przydzialy/${id}`);
+  zmieniono('pokoje');
 }
 
-// Zamknij aktualne przypisanie (np. gdy pacjent zmienia pokój / kończy pobyt)
+// Zamknij aktualne przypisanie (np. gdy pacjent kończy pobyt w pokoju)
 export async function closeAssignment(id: string, toDate: string): Promise<void> {
-  await updateDoc(doc(db, ASSIGNMENTS, id), { toDate });
+  await api('PUT', `/przydzialy/${id}`, { doDaty: toDate });
+  zmieniono('pokoje');
 }
 
-// Sync: gdy pacjent zmienia treatmentEndDate, zaktualizuj toDate w przypisaniach,
-// ale TYLKO te które były wcześniej zsynchronizowane (toDate === oldEndDate).
-// Pomijamy: toDate=null (open-ended, raporty już używają Patient.treatmentEndDate),
-// historyczne (toDate w przeszłości), i te z różną datą (admin świadomie ustawił).
-// Zwraca liczbę zaktualizowanych przypisań.
-export async function syncAssignmentsToPatientEndDate(args: {
-  patientId: string;
-  oldEndDate: string | undefined;
-  newEndDate: string | undefined;
-}): Promise<number> {
-  const { patientId, oldEndDate, newEndDate } = args;
-  if (!oldEndDate || !newEndDate || oldEndDate === newEndDate) return 0;
-
-  const today = new Date().toISOString().slice(0, 10);
-  let updated = 0;
-
-  const snap = await getDocs(query(
-    collection(db, ASSIGNMENTS),
-    where('patientId', '==', patientId),
-  ));
-
-  for (const docSnap of snap.docs) {
-    const a = docSnap.data() as RoomAssignment;
-    if (a.toDate === null || a.toDate === undefined) continue; // open-ended → zostaw
-    if (a.toDate < today) continue;                            // historyczne → zostaw
-    if (a.toDate !== oldEndDate) continue;                     // admin zmienił → zostaw
-    await updateDoc(doc(db, ASSIGNMENTS, docSnap.id), { toDate: newEndDate });
-    updated++;
-  }
-  return updated;
-}
-
-// Przesuń pacjenta do innego pokoju: zamknij stare, otwórz nowe
+// Przeniesienie: serwer zamyka stary przydział i otwiera nowy w jednej transakcji.
 export async function movePatientToRoom(args: {
   patientId: string;
   oldAssignmentId: string | null;
   newRoomId: string;
-  fromDate: string;       // od kiedy w nowym pokoju
-  toDate?: string | null; // opcjonalnie: do kiedy (default null = "do odwołania")
+  fromDate: string;
+  toDate?: string | null;
   notes?: string;
 }): Promise<string> {
-  const { patientId, oldAssignmentId, newRoomId, fromDate, toDate, notes } = args;
-  if (oldAssignmentId) {
-    // toDate stare = fromDate nowego (zazwyczaj)
-    await closeAssignment(oldAssignmentId, fromDate);
-  }
-  return await createAssignment({
-    patientId,
-    roomId: newRoomId,
-    fromDate,
-    toDate: toDate ?? null,
-    notes,
-    createdAt: new Date().toISOString(),
-  });
+  const r = await zPotwierdzeniemPelnego((m) => api('POST', '/przydzialy/przeniesienie', przydzialDoApi({
+    patientId: args.patientId, roomId: args.newRoomId, fromDate: args.fromDate, toDate: args.toDate ?? null, notes: args.notes,
+  }, m)));
+  zmieniono('pokoje');
+  return r.id;
 }

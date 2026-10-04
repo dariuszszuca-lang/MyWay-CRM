@@ -48,9 +48,19 @@ export interface Patient {
   // Authorization for discharge with outstanding debt (only for dischargeType='completed')
   dischargeAuthorizedBy?: 'Natalia' | 'Krystian';
   dischargeAuthorizedNote?: string;
+
+  // --- AWS (gałąź aws) ---
+  // Numer wersji karty z serwera: zapis ze starą wersją jest odrzucany (ktoś zmienił kartę w międzyczasie).
+  wersja?: number;
+  // true = pełna karta (adres, e-mail, dowód, lista wpłat i usług) pobrana z serwera z wpisem w dzienniku.
+  // false/brak = wiersz listy: tych pól nie ma, a amountPaid i suma usług pochodzą z sum na serwerze.
+  pelny?: boolean;
+  sumaUslug?: number;
 }
 
 export interface Payment {
+  id?: string;        // AWS: identyfikator wpisu (brak = nowa wpłata do zapisania)
+  cancelled?: boolean; // AWS: wpłata anulowana (storno), zostaje w historii
   amount: number;
   date: string;
   method: 'przelew' | 'gotowka' | 'karta' | 'przedplata';
@@ -60,6 +70,8 @@ export interface Payment {
 export type AdditionalServiceType = 'recepta' | 'psychiatra' | 'kroplowka' | 'detoks' | 'przedluzenie' | 'inne';
 
 export interface AdditionalService {
+  id?: string;        // AWS: identyfikator wpisu
+  cancelled?: boolean;
   type: AdditionalServiceType;
   date: string;
   amount: number;
@@ -104,6 +116,8 @@ export interface QueuePatient {
   // Stan
   createdAt: string;
   status: 'waiting' | 'confirmed' | 'cancelled' | 'noshow';
+  wersja?: number;  // AWS: wersja wpisu
+  pelny?: boolean;  // AWS: true = karta z PESEL, dowodem i adresem
 }
 
 // Discharge type labels
@@ -124,7 +138,9 @@ export const isInterruptedTherapy = (patient: Patient): boolean => {
 
 // Total additional services cost
 export const getAdditionalServicesTotal = (patient: Patient): number => {
-  return (patient.additionalServices || []).reduce((sum, s) => sum + (s.amount || 0), 0);
+  // AWS: wiersz listy nie ma listy usług, tylko ich sumę policzoną na serwerze.
+  if (patient.additionalServices === undefined && typeof patient.sumaUslug === 'number') return patient.sumaUslug;
+  return (patient.additionalServices || []).filter(s => !s.cancelled).reduce((sum, s) => sum + (s.amount || 0), 0);
 };
 
 // Derived property for amount due (includes additional services)
@@ -177,6 +193,7 @@ export interface Room {
   disabledFrom?: string;   // YYYY-MM-DD
   disabledTo?: string;     // YYYY-MM-DD
   order?: number;          // do sortowania w UI
+  wersja?: number;         // AWS: wersja rekordu
 }
 
 export interface RoomAssignment {

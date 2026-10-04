@@ -101,11 +101,8 @@ const RoomAssignmentManager: React.FC<Props> = ({ patients, rooms, assignments, 
     if (!room) return;
     if (room.isDisabled) return alert(`Pokój ${room.number} jest wyłączony (${room.disabledReason || 'brak powodu'}).`);
 
-    // Walidacja kolizji w dniu przyjazdu (uwzględnia datę zakończenia terapii)
-    const occAtArrival = occupancyAtDate(room.id, moveDate);
-    if (occAtArrival >= room.capacity) {
-      if (!confirm(`W pokoju ${room.number} w dniu ${moveDate} jest już ${occAtArrival}/${room.capacity} osób. Mimo to przypisać?`)) return;
-    }
+    // AWS: obłożenie w dniu przyjazdu sprawdza serwer. Gdy pokój jest pełny, serwis (roomsService)
+    // pokaże pytanie „mimo to przypisać?” z liczbą osób podaną przez serwer.
 
     try {
       const toDateValue = moveToDate || null;

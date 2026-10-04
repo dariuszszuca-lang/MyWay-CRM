@@ -25,14 +25,41 @@ interface PatientListProps {
   onDischargePatient: (patient: Patient, dischargeData: DischargeData) => void;
   onReactivatePatient: (patient: Patient) => void;
   onUpdateDischarge: (patient: Patient, dischargeData: DischargeData) => void;
+  // AWS: pełna karta (adres, e-mail, dowód, wpłaty i usługi) pobierana na żądanie; serwer zapisuje to w dzienniku.
+  onLoadFullPatient: (id: string) => Promise<Patient>;
+  onAddPayment: (id: string, payment: Payment) => Promise<void>;
 }
 
-const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, onSaveNotes, onDeletePatient, onDischargePatient, onReactivatePatient, onUpdateDischarge }) => {
+const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, onSaveNotes, onDeletePatient, onDischargePatient, onReactivatePatient, onUpdateDischarge, onLoadFullPatient, onAddPayment }) => {
   const [filterPackage, setFilterPackage] = useState<'all' | '1' | '2' | '3' | '6tyg' | '8tyg' | '6tyg_roz' | '8tyg_roz' | 'interwencyjna' | 'vip'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'discharged' | 'interrupted'>('active');
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [notesPatient, setNotesPatient] = useState<Patient | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // AWS: pełne karty pobrane w tej sesji (adres i e-mail pokazujemy dopiero po kliknięciu).
+  const [pelneKarty, setPelneKarty] = useState<Record<string, Patient>>({});
+  const [ladujeKarte, setLadujeKarte] = useState<string | null>(null);
+
+  // Zawsze świeża karta z serwera (do edycji i dokumentów). Każde pobranie trafia do dziennika dostępu.
+  const pobierzKarte = async (patient: Patient): Promise<Patient | null> => {
+    setLadujeKarte(patient.id);
+    try {
+      const pelna = await onLoadFullPatient(patient.id);
+      setPelneKarty(prev => ({ ...prev, [patient.id]: pelna }));
+      return pelna;
+    } catch (err) {
+      alert(`Nie udało się pobrać karty pacjenta. ${(err as Error).message}`);
+      return null;
+    } finally {
+      setLadujeKarte(null);
+    }
+  };
+  // Karta do wyświetlenia: tylko gdy nie zmieniła się od pobrania (ta sama wersja co w wierszu listy).
+  const kartaDoWgladu = (patient: Patient): Patient | undefined => {
+    const k = pelneKarty[patient.id];
+    return k && k.wersja === patient.wersja ? k : undefined;
+  };
 
   // Discharge modal state
   const [dischargeModalPatient, setDischargeModalPatient] = useState<Patient | null>(null);
@@ -180,16 +207,8 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
       return;
     }
 
-    const wplaty = [
-      ...wplatyPacjenta(paymentModalPatient),
-      { amount: paymentAmount, date: paymentDate, method: paymentMethod, purpose: paymentPurpose },
-    ];
-
-    onUpdatePatient({
-      ...paymentModalPatient,
-      payments: wplaty,
-      amountPaid: wplaty.reduce((suma, w) => suma + (w.amount || 0), 0),
-    });
+    // AWS: wpłata to osobny wpis na serwerze (wpis, saldo i dziennik w jednej transakcji), a nie nadpisanie całego pacjenta.
+    onAddPayment(paymentModalPatient.id, { amount: paymentAmount, date: paymentDate, method: paymentMethod, purpose: paymentPurpose });
     setPaymentModalPatient(null);
   };
 
@@ -367,7 +386,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                 <span className="font-semibold">
                   {formatCurrency(wplatyPacjenta(paymentModalPatient).reduce((s, w) => s + (w.amount || 0), 0))}
                   <span className="text-gray-400 font-normal ml-1">
-                    ({wplatyPacjenta(paymentModalPatient).length} wpł.)
+                    {paymentModalPatient.payments ? `(${wplatyPacjenta(paymentModalPatient).length} wpł.)` : ''}
                   </span>
                 </span>
               </div>
@@ -996,7 +1015,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                            )}
                          </div>
                          <div className="flex gap-1 ml-2">
-                            <button onClick={() => setEditingPatient(patient)} className="p-1 text-gray-400 hover:text-teal-600" title="Edytuj dane">
+                            <button onClick={async () => { const k = await pobierzKarte(patient); if (k) setEditingPatient(k); }} disabled={ladujeKarte === patient.id} className="p-1 text-gray-400 hover:text-teal-600 disabled:opacity-50" title="Edytuj dane" aria-label={`Edytuj dane: ${patient.firstName} ${patient.lastName}`}>
                                 <Pencil className="w-4 h-4" />
                             </button>
                             <button onClick={() => onDeletePatient(patient.id)} className="p-1 text-gray-400 hover:text-red-600" title="Usuń pacjenta">
@@ -1007,7 +1026,11 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                     <div className="text-xs text-gray-500 mb-1">PESEL: {patient.pesel}</div>
                     <div className="text-xs text-gray-700 mt-2 bg-gray-100 p-1.5 rounded inline-block">
                       {patient.voivodeship}<br/>
-                      <span className="text-gray-500">{patient.address}</span>
+                      {kartaDoWgladu(patient)
+                        ? <span className="text-gray-500">{kartaDoWgladu(patient)!.address || 'brak adresu'}</span>
+                        : <button type="button" onClick={() => pobierzKarte(patient)} disabled={ladujeKarte === patient.id} className="inline-flex items-center gap-1 text-teal-700 hover:text-teal-900 underline disabled:opacity-50" title="Otwarcie danych zapisuje się w dzienniku dostępu">
+                            <Eye className="w-3 h-3" aria-hidden="true" />{ladujeKarte === patient.id ? 'Wczytuję…' : 'Pokaż adres i e-mail'}
+                          </button>}
                     </div>
                   </td>
 
@@ -1024,7 +1047,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                         <MessageCircle className="w-3 h-3" /> WhatsApp
                       </a>
                     )}
-                    <div className="text-xs text-gray-500 break-all">{patient.email}</div>
+                    <div className="text-xs text-gray-500 break-all">{kartaDoWgladu(patient)?.email || ''}</div>
                   </td>
 
                   {/* Terapia / Pakiet */}
@@ -1124,14 +1147,14 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                   {/* Dokumenty */}
                   <td className="p-3 align-top text-right space-y-2">
                     <button
-                      onClick={() => generateContract(patient)}
+                      onClick={async () => { const k = await pobierzKarte(patient); if (k) generateContract(k); }}
                       className="w-full justify-center inline-flex items-center gap-1 px-3 py-1.5 border border-teal-600 text-teal-600 rounded hover:bg-teal-50 text-xs font-medium transition-colors"
                     >
                       <FileText className="w-3 h-3" />
                       Umowa
                     </button>
                     <button
-                      onClick={() => generatePatientCard(patient)}
+                      onClick={async () => { const k = await pobierzKarte(patient); if (k) generatePatientCard(k); }}
                       className="w-full justify-center inline-flex items-center gap-1 px-3 py-1.5 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 text-xs font-medium transition-colors"
                     >
                       <User className="w-3 h-3" />

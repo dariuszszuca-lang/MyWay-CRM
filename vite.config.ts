@@ -11,6 +11,8 @@ export default defineConfig(({ mode }) => {
       },
       plugins: [react()],
       define: {
+        // amazon-cognito-identity-js oczekuje zmiennej global (środowisko Node); w przeglądarce to globalThis.
+        global: 'globalThis',
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
       },
