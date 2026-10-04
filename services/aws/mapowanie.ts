@@ -35,7 +35,7 @@ export function pacjentZApi(r: any, pelny = false): Patient {
     totalAmount: r.kwotaPakietu ?? 0,
     amountPaid: r.sumaWplat ?? 0,
     paymentDeadline: r.terminPlatnosci || '',
-    paymentMethod: 'przelew',
+    paymentMethod: r.metodaPlatnosci || 'przelew',
     isWeek5: Boolean(r.tydzien5),
     hasWhatsapp: Boolean(r.whatsapp),
     onlineConsultations: r.konsultacjeOnline ?? 0,
@@ -52,7 +52,19 @@ export function pacjentZApi(r: any, pelny = false): Patient {
     wersja: r.wersja,
     pelny,
     sumaUslug: r.sumaUslug ?? 0,
+    // Wiersz listy: zamiast listy usług serwer daje liczbę i kwotę wg rodzaju. Odtwarzamy z nich wpisy
+    // (pierwszy z pełną kwotą, kolejne po 0), żeby statystyki liczyły sztuki i kwoty jak dotąd.
+    // Pełna karta nadpisuje to prawdziwą listą usług (dane.ts pobierzPelnego).
+    additionalServices: pelny ? undefined : uslugiZLicznikow(r.uslugiWgRodzaju),
   };
+}
+
+function uslugiZLicznikow(wg: Record<string, { ile: number; kwota: number }> | undefined): AdditionalService[] {
+  const out: AdditionalService[] = [];
+  for (const [typ, l] of Object.entries(wg || {})) {
+    for (let i = 0; i < l.ile; i += 1) out.push({ type: typ as AdditionalService['type'], date: '', amount: i === 0 ? l.kwota : 0 });
+  }
+  return out;
 }
 
 export const wplataZApi = (w: any): Payment => ({ id: w.id, cancelled: Boolean(w.anulowano), amount: w.kwota, date: w.data, method: w.metoda, purpose: w.cel || undefined });
@@ -79,6 +91,7 @@ export function pacjentDoApi(p: Patient): Record<string, unknown> {
     pakiet: p.package,
     kwotaPakietu: Number(p.totalAmount) || 0,
     terminPlatnosci: p.paymentDeadline || '',
+    metodaPlatnosci: p.paymentMethod || 'przelew',
     whatsapp: Boolean(p.hasWhatsapp),
     tydzien5: Boolean(p.isWeek5),
     konsultacjeOnline: Number(p.onlineConsultations) || 0,

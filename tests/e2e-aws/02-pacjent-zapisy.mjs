@@ -75,7 +75,7 @@ try {
   await strona.getByRole('button', { name: 'Wypisz pacjenta' }).click();
   await strona.waitForFunction((n) => ![...document.querySelectorAll('tbody tr')].some((r) => r.textContent.includes(n)), NAZWISKO, { timeout: 20000 }).catch(() => {});
   sprawdz('wypis (rezygnacja): pacjent znika z aktywnych', await wiersz().count() === 0, komunikaty.slice(-2).join(' | '));
-  sprawdz('wypis: komunikat potwierdzenia', komunikaty.some((k) => k.includes('wypisany: Rezygnacja z terapii')), komunikaty.slice(-2).join(' | '));
+  sprawdz('wypis: komunikat potwierdzenia', komunikaty.some((k) => k.includes('wypisany — Rezygnacja z terapii')), komunikaty.slice(-2).join(' | '));
   await strona.getByRole('button', { name: 'Wypisani', exact: true }).click();
   await wiersz().waitFor({ timeout: 15000 });
   sprawdz('wypisany jest na liście wypisanych', await wiersz().count() === 1);

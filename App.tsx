@@ -12,13 +12,16 @@ import { Activity, Users, Cloud, RefreshCw, LogOut, Clock, BarChart3, AlertTrian
 import { Sesja, sesja as pobierzSesje, wyloguj } from './services/aws/auth';
 import { nasluchuj, ustawObslugeWygasniecia } from './services/aws/api';
 import { AWS_CONFIG } from './services/aws/config';
+import { sendWelcomeEmail, confirmPatientEmail, dischargePatientEmail } from './services/getResponseService';
 import {
-  DaneWypisu, dodajDoKolejki, dodajPacjenta, dodajWplate, pobierzKarteKolejki, pobierzKolejke, pobierzPacjentow, pobierzPelnego,
+  DaneWypisu, dodajDoKolejki, dodajPacjenta, dodajWplate, integracjeWlaczone, pobierzKarteKolejki, pobierzKolejke, pobierzPacjentow, pobierzPelnego,
   przywroc, usunPacjenta, usunZKolejki, wypisz, zapiszKolejke, zapiszNotatki, zapiszPacjenta, zmienWypis,
 } from './services/aws/dane';
 
-// Gałąź aws: dane i logowanie na koncie AWS MyWay (Frankfurt). Na podglądzie WYŁĄCZONE są:
-// maile do pacjentów i listy GetResponse (Etap 2), Telefony, Dziennik zamówień.
+// Gałąź aws: dane i logowanie na koncie AWS MyWay (Frankfurt).
+// Maile do pacjentów, listy GetResponse i synchronizacja z MyWayPoint działają jak w obecnym CRM
+// (te same funkcje myway-point-app), z jednym wyjątkiem: w ośrodkach testowych są wyłączone,
+// żeby fikcyjne dane nie trafiały do prawdziwych list i skrzynek. Jeszcze nieprzeniesione: Telefony, Dziennik.
 type ActiveTab = 'form' | 'list' | 'queue' | 'stats' | 'rooms' | 'reports';
 
 const komunikat = (e: unknown) => (e instanceof Error ? e.message : 'Nieznany błąd.');
@@ -80,8 +83,40 @@ const App: React.FC = () => {
   const handleAddPatient = async (patientData: Patient) => {
     try {
       const zKolejki = admittingQueueId ? queue.find((q) => q.id === admittingQueueId) || prefillQueue || undefined : undefined;
-      await dodajPacjenta(patientData, zKolejki || undefined);
-      // Powiadomienia, mail powitalny i synchronizacja z MyWayPoint zostają w obecnym systemie (Etap 2).
+      const noweId = await dodajPacjenta(patientData, zKolejki || undefined);
+
+      // Jak w obecnym CRM: listy GetResponse oraz, dla pakietu 3, konto w MyWayPoint (20 sesji).
+      // (Wywołanie notifyNewPatient pominięte: ten adres nie istnieje, obecny CRM ignorował jego błąd.)
+      if (integracjeWlaczone()) {
+        const emailSent = await sendWelcomeEmail({
+          email: patientData.email,
+          firstName: patientData.firstName,
+          lastName: patientData.lastName,
+          package: patientData.package,
+          phone: patientData.phone,
+        });
+        if (!emailSent) console.warn('⚠️ Nie udało się dodać pacjenta do GetResponse');
+
+        if (patientData.package === '3') {
+          try {
+            const response = await fetch('https://europe-west1-myway-point-app.cloudfunctions.net/createPatientFromCRM', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                firstName: patientData.firstName,
+                lastName: patientData.lastName,
+                email: patientData.email,
+                phone: patientData.phone,
+                totalSessions: 20,
+                crmPatientId: noweId,
+              }),
+            });
+            if (!response.ok) console.error('MyWayPoint sync error:', response.status);
+          } catch (syncError) {
+            console.error('MyWayPoint sync failed:', komunikat(syncError));
+          }
+        }
+      }
       setAdmittingQueueId(null);
       setPrefillQueue(null);
       setActiveTab('list');
@@ -154,11 +189,34 @@ const App: React.FC = () => {
     }
   };
 
-  // Potwierdzenie osoby w kolejce. Mail powitalny i listy GetResponse: na podglądzie AWS wyłączone (Etap 2).
+  // Potwierdzenie osoby w kolejce → mail powitalny + listy GetResponse (jak w obecnym CRM).
   const handleConfirmQueuePatient = async (patient: QueuePatient) => {
     try {
+      // 1. Status w kolejce
       await zapiszKolejke({ ...patient, status: 'confirmed' });
-      alert(`✅ ${patient.firstName} potwierdzony. Mail powitalny nie został wysłany (podgląd AWS, maile dojdą w Etapie 2).`);
+
+      // 2. Mail powitalny + listy (jeśli jest e-mail). W ośrodku testowym wyłączone.
+      if (!integracjeWlaczone()) {
+        alert(`✅ ${patient.firstName} potwierdzony. Mail powitalny nie został wysłany (ośrodek testowy: maile wyłączone).`);
+      } else if (patient.email) {
+        const result = await confirmPatientEmail({
+          email: patient.email,
+          firstName: patient.firstName,
+          lastName: patient.lastName,
+          package: patient.package,
+          phone: patient.phone,
+          startDate: patient.plannedStartDate,
+          endDate: patient.plannedEndDate,
+          detoksPackage: patient.detoksPackage,
+        });
+        if (result) {
+          alert(`✅ ${patient.firstName} potwierdzony! Mail powitalny wysłany + dodany do list GetResponse.`);
+        } else {
+          alert(`⚠️ ${patient.firstName} potwierdzony, ale wystąpił problem z mailem/listami.`);
+        }
+      } else {
+        alert(`✅ ${patient.firstName} potwierdzony (brak e-mail — mail nie wysłany).`);
+      }
     } catch (err) {
       alert(`Błąd podczas potwierdzania. ${komunikat(err)}`);
     }
@@ -176,7 +234,20 @@ const App: React.FC = () => {
         expelled: 'Wydalony',
       };
       const pokoj = r.zwolnionePrzydzialy > 0 ? ' Pokój zwolniony.' : '';
-      alert(`✅ ${patient.firstName} wypisany: ${typeLabels[dischargeData.dischargeType]}.${pokoj}`);
+
+      // Mail pożegnalny TYLKO przy zakończeniu terapii (jak w obecnym CRM). E-mail jest w pełnej karcie.
+      if (dischargeData.dischargeType === 'completed' && integracjeWlaczone()) {
+        let email = '';
+        try { email = (await pobierzPelnego(patient.id)).email; } catch { /* brak karty = brak maila */ }
+        if (email) {
+          const result = await dischargePatientEmail({ email, firstName: patient.firstName, package: patient.package });
+          alert(result
+            ? `✅ ${patient.firstName} wypisany (zakończenie terapii). Mail pożegnalny wysłany.${pokoj}`
+            : `⚠️ ${patient.firstName} wypisany, ale problem z wysyłką maila.${pokoj}`);
+          return;
+        }
+      }
+      alert(`✅ ${patient.firstName} wypisany — ${typeLabels[dischargeData.dischargeType]}.${pokoj}`);
     } catch (err) {
       alert(`Nie udało się wypisać pacjenta. ${komunikat(err)}`);
     }
@@ -485,6 +556,8 @@ const App: React.FC = () => {
                   onAdmitPatient={handleAdmitPatient}
                   onConfirmPatient={handleConfirmQueuePatient}
                   allPatients={patients}
+                  onLoadFullQueue={pobierzKarteKolejki}
+                  onLoadFullPatient={handleLoadFullPatient}
                 />
               </div>
             )}

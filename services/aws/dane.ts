@@ -11,6 +11,12 @@ import {
 const wierszeListy = new Map<string, Patient>();
 const pelneKarty = new Map<string, Patient>();
 const wierszeKolejki = new Map<string, QueuePatient>();
+const pelneKolejki = new Map<string, QueuePatient>();
+
+// Ośrodek zalogowanej osoby (z odpowiedzi serwera). Ośrodki testowe mają wyłączone maile i integracje.
+let osrodekBiezacy = '';
+const OSRODKI_TESTOWE = ['testowy', 'testowy-2'];
+export const integracjeWlaczone = () => osrodekBiezacy !== '' && !OSRODKI_TESTOWE.includes(osrodekBiezacy);
 
 // Pola, których wiersz listy nie zawiera. Zapis z wiersza nigdy ich nie wysyła (inaczej wyczyściłby je na serwerze).
 const TYLKO_W_KARCIE = ['adres', 'email', 'dowod', 'terminPlatnosci'];
@@ -20,6 +26,7 @@ const kopia = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
 // ---------- pacjenci ----------
 export async function pobierzPacjentow(): Promise<Patient[]> {
   const r = await api('GET', '/pacjenci');
+  osrodekBiezacy = r.osrodek || '';
   const lista: Patient[] = (r.pacjenci || []).map((x: any) => pacjentZApi(x));
   wierszeListy.clear();
   lista.forEach((p) => wierszeListy.set(p.id, kopia(p)));
@@ -197,7 +204,9 @@ export async function pobierzKolejke(): Promise<QueuePatient[]> {
 
 // Pełny wpis kolejki z PESEL, dowodem i adresem (otwarcie zapisuje się w dzienniku).
 export async function pobierzKarteKolejki(id: string): Promise<QueuePatient> {
-  return kolejkaZApi(await api('GET', `/kolejka/${id}`), true);
+  const q = kolejkaZApi(await api('GET', `/kolejka/${id}`), true);
+  pelneKolejki.set(id, kopia(q));
+  return q;
 }
 
 export async function dodajDoKolejki(q: QueuePatient): Promise<string> {
@@ -207,12 +216,14 @@ export async function dodajDoKolejki(q: QueuePatient): Promise<string> {
 }
 
 export async function zapiszKolejke(nowy: QueuePatient): Promise<void> {
-  const stary = wierszeKolejki.get(nowy.id);
+  // Wpis edytowany w formularzu jest pełny (z PESEL, dowodem i adresem): porównujemy go z pełnym oryginałem.
+  const stary = nowy.pelny ? pelneKolejki.get(nowy.id) : wierszeKolejki.get(nowy.id);
   if (!stary) throw new BladApi(409, 'nieaktualne', 'Dane na ekranie są nieaktualne. Odśwież kolejkę i spróbuj ponownie.');
   const zmiany = tylkoZmienione(kolejkaDoApi(stary), kolejkaDoApi(nowy));
   if (nowy.status !== stary.status) zmiany.status = STATUS_KOLEJKI_DO_API[nowy.status];
   if (Object.keys(zmiany).length === 0) return;
   await api('PUT', `/kolejka/${nowy.id}`, { ...zmiany, wersja: stary.wersja });
+  pelneKolejki.delete(nowy.id);
   zmieniono('kolejka');
 }
 

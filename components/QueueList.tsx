@@ -10,6 +10,9 @@ interface QueueListProps {
   onAdmitPatient: (patient: QueuePatient) => void;
   onConfirmPatient: (patient: QueuePatient) => void;
   allPatients?: Patient[];
+  // AWS: pełny wpis kolejki (PESEL, dowód, adres) pobierany przed edycją; serwer zapisuje to w dzienniku.
+  onLoadFullQueue?: (id: string) => Promise<QueuePatient>;
+  onLoadFullPatient?: (id: string) => Promise<Patient>;
 }
 
 const statusConfig = {
@@ -19,7 +22,7 @@ const statusConfig = {
   noshow: { label: 'Nie przyjechał', color: 'bg-orange-100 text-orange-800 border-orange-200', icon: UserX },
 };
 
-const QueueList: React.FC<QueueListProps> = ({ queue, onUpdateQueue, onDeleteQueue, onAdmitPatient, onConfirmPatient, allPatients = [] }) => {
+const QueueList: React.FC<QueueListProps> = ({ queue, onUpdateQueue, onDeleteQueue, onAdmitPatient, onConfirmPatient, allPatients = [], onLoadFullQueue, onLoadFullPatient }) => {
   const [editingPatient, setEditingPatient] = useState<QueuePatient | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'waiting' | 'confirmed' | 'cancelled' | 'noshow'>('all');
@@ -79,6 +82,7 @@ const QueueList: React.FC<QueueListProps> = ({ queue, onUpdateQueue, onDeleteQue
           <div className="w-full max-w-4xl my-8 animate-in fade-in zoom-in duration-200">
             <QueueForm
               initialData={editingPatient}
+              onLoadFullPatient={onLoadFullPatient}
               onSubmit={handleSaveEdit}
               onCancel={() => setEditingPatient(null)}
               allPatients={allPatients}
@@ -219,7 +223,11 @@ const QueueList: React.FC<QueueListProps> = ({ queue, onUpdateQueue, onDeleteQue
                   </button>
                 )}
                 <button
-                  onClick={() => setEditingPatient(patient)}
+                  onClick={async () => {
+                    if (!onLoadFullQueue) return setEditingPatient(patient);
+                    try { setEditingPatient(await onLoadFullQueue(patient.id)); }
+                    catch (err) { alert(`Nie udało się otworzyć wpisu. ${(err as Error).message}`); }
+                  }}
                   className="px-3 py-2 bg-white border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-100 transition-colors"
                   title="Edytuj"
                 >

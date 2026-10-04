@@ -38,6 +38,17 @@ try {
   await strona.getByText(NAZWISKO).first().waitFor({ timeout: 20000 });
   sprawdz('kolejka: osoba dodana i widoczna', komunikaty.some((k) => k.includes('Dodano do kolejki')), komunikaty.join(' | '));
 
+  // --- edycja wpisu: formularz dostaje pełny wpis z serwera (PESEL, adres), nie pusty wiersz listy ---
+  await strona.getByTitle('Edytuj').last().click();
+  const edycja = strona.locator('form').filter({ has: strona.getByRole('button', { name: 'Zapisz zmiany' }) });
+  await edycja.waitFor({ timeout: 20000 });
+  sprawdz('kolejka: edycja pokazuje PESEL i adres z pełnego wpisu',
+    await edycja.locator('[name="pesel"]').inputValue() === pesel && await edycja.locator('[name="address"]').inputValue() === 'ul. Kolejkowa 7, 00-000 Testowo');
+  await edycja.locator('[name="phone"]').fill('000555777');
+  await edycja.getByRole('button', { name: 'Zapisz zmiany' }).click();
+  await strona.getByText('000555777').first().waitFor({ timeout: 20000 });
+  sprawdz('kolejka: zmiana telefonu zapisana', true);
+
   await strona.getByTitle(/Potwierdź termin/).last().click();
   await strona.waitForTimeout(2500);
   sprawdz('kolejka: potwierdzenie z informacją, że mail nie wyszedł (podgląd)', komunikaty.some((k) => k.includes('potwierdzony') && k.includes('Mail powitalny nie został wysłany')), komunikaty.slice(-1)[0]);

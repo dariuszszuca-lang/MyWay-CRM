@@ -25,7 +25,8 @@ try {
   const wiersze = strona.locator('tbody tr');
   const ile = await wiersze.count();
   sprawdz('lista: są fikcyjni pacjenci ośrodka testowy', ile >= 3, ile);
-  const pierwszy = wiersze.first();
+  // Wiersz pacjenta założonego przez testy API z PESEL-em i adresem (nie każdy fikcyjny pacjent je ma).
+  const pierwszy = strona.locator('tbody tr', { hasText: 'Fikcyjny' }).first();
   const tekst = await pierwszy.innerText();
   sprawdz('wiersz: PESEL widoczny (11 cyfr)', /PESEL: \d{11}/.test(tekst), tekst.slice(0, 120));
   sprawdz('wiersz: adres ukryty do kliknięcia', tekst.includes('Pokaż adres i e-mail') && !tekst.includes('ul. Testowa'));
