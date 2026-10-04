@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "../../firebaseConfig";
+import { api } from "../../services/aws/api";
+import { pobierzTrescZrodla } from "../../services/telephony";
 import { csvCell } from "../../functions/telephony/core.mjs";
 
 export default function ImportedSources() {
@@ -8,15 +8,19 @@ export default function ImportedSources() {
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     let active = true;
-    getDocs(collection(db, "phoneImportSources")).then(
-      (rows) => active && setSources(rows.docs.map((d) => ({ ...d.data(), id: d.id }))),
+    // AWS: lista bez treści; treść materiału pobieramy dopiero przy kliknięciu „Pobierz”.
+    api("GET", "/telefonia/zrodla").then(
+      (r) => active && setSources(r.rows || []),
       () => active && setFailed(true),
     );
     return () => { active = false; };
   }, []);
   if (failed) return <p className="text-sm text-amber-800">Nie udało się pobrać materiałów źródłowych importu.</p>;
   if (!sources.length) return null;
-  const download = (s: any) => {
+  const download = async (meta: any) => {
+    let s = meta;
+    try { s = { ...meta, ...(await pobierzTrescZrodla(meta.id)) }; }
+    catch { alert("Nie udało się pobrać materiału."); return; }
     const table = s.format === "table";
     const content = table ? "\uFEFF" + JSON.parse(s.content).map((row: any[]) => row.map(csvCell).join(";")).join("\r\n") : s.content;
     const url = URL.createObjectURL(new Blob([content], { type: table ? "text/csv;charset=utf-8" : "text/plain;charset=utf-8" }));

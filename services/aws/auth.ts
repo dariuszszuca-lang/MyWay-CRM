@@ -13,6 +13,8 @@ const pool = new CognitoUserPool({
 
 export interface Sesja {
   email: string;
+  // Nazwa wyświetlana konta (atrybut „name”). W telefonii trafia do pola „owner” kontaktu, jak dotąd nazwa z konta Google.
+  nazwa: string;
   konto: string;
   grupy: string[];
   token: string;
@@ -31,6 +33,7 @@ const naSesje = (s: CognitoUserSession): Sesja => {
   const id = s.getIdToken().decodePayload();
   return {
     email: String(id.email || ''),
+    nazwa: String(id.name || id.email || ''),
     konto: String(dostep.payload.sub),
     grupy: (dostep.payload['cognito:groups'] as string[]) || [],
     token: dostep.getJwtToken(),

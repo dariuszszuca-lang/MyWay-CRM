@@ -44,7 +44,7 @@ export async function api<T = any>(metoda: 'GET' | 'POST' | 'PUT' | 'DELETE', sc
 }
 
 // Powiadamianie widoków o zmianie danych (zamiast nasłuchu na żywo z Firestore).
-type Temat = 'pacjenci' | 'kolejka' | 'pokoje';
-const sluchacze: Record<Temat, Set<() => void>> = { pacjenci: new Set(), kolejka: new Set(), pokoje: new Set() };
+type Temat = 'pacjenci' | 'kolejka' | 'pokoje' | 'telefonia';
+const sluchacze: Record<Temat, Set<() => void>> = { pacjenci: new Set(), kolejka: new Set(), pokoje: new Set(), telefonia: new Set() };
 export const zmieniono = (...tematy: Temat[]) => tematy.forEach((t) => sluchacze[t].forEach((fn) => fn()));
 export const nasluchuj = (temat: Temat, fn: () => void) => { sluchacze[temat].add(fn); return () => { sluchacze[temat].delete(fn); }; };

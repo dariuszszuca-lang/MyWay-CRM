@@ -1,16 +1,8 @@
-import { savePhoneContactIn } from "./phoneStore";
-import {
-  collection,
-  doc,
-  onSnapshot,
-  runTransaction,
-  serverTimestamp,
-  addDoc,
-} from "firebase/firestore";
-import { db } from "../firebaseConfig";
-import { auth } from "../firebaseConfig";
-import { canAccessStats } from "./accessControl";
-import { validateContact, validateCall } from "../functions/telephony/core.mjs";
+// Telefonia przez API na AWS (gałąź aws). Te same nazwy funkcji i typy co wcześniej,
+// żeby komponenty telefonii nie wymagały zmian. Poprzednia wersja na Firestore: telephony.firebase.ts.bak.
+// Reguły (walidacje, okresy, podsumowania) dalej pochodzą z functions/telephony/core.mjs; serwer ma kopię 1:1.
+import { api, BladApi, nasluchuj, zmieniono } from "./aws/api";
+import { AWS_CONFIG } from "./aws/config";
 export * from "../functions/telephony/core.mjs";
 
 export interface PhoneContact {
@@ -84,30 +76,76 @@ export type PhoneFilters = {
   quality?: string;
   kind?: string;
 };
+// Kolekcje Firestore -> ścieżki API. Nazwy zostają, bo używa ich TelefonyTab.
+const SCIEZKI: Record<string, string> = {
+  phoneContacts: "/telefonia/kontakty",
+  phoneCalls: "/telefonia/rozmowy",
+  phoneFinancials: "/telefonia/finanse",
+  phoneReports: "/telefonia/raporty",
+  phoneReportState: "/telefonia/stan-raportow",
+  phoneImportSources: "/telefonia/zrodla",
+};
+
+// Zamiast nasłuchu Firestore: pobranie od razu, potem co 20 s i po każdym zapisie w telefonii.
 export function watchPhoneCollection<T>(
   name: string,
   next: (v: T[]) => void,
   error: () => void,
 ) {
-  return onSnapshot(
-    collection(db, name),
-    (s) => next(s.docs.map((d) => ({ ...d.data(), id: d.id }) as T)),
-    () => error(),
-  );
+  const sciezka = SCIEZKI[name];
+  if (!sciezka) {
+    error();
+    return () => {};
+  }
+  let zywe = true;
+  const wczytaj = async () => {
+    try {
+      const r = await api("GET", sciezka);
+      if (zywe) next((r.rows || []) as T[]);
+    } catch {
+      if (zywe) error();
+    }
+  };
+  wczytaj();
+  const odlacz = nasluchuj("telefonia", wczytaj);
+  const zegar = window.setInterval(wczytaj, AWS_CONFIG.odswiezanieMs);
+  return () => {
+    zywe = false;
+    odlacz();
+    window.clearInterval(zegar);
+  };
 }
+
+// Zapis kontaktu (+ rozmowa, + kwota): serwer robi to w jednej transakcji z historią zmian,
+// według tych samych reguł co dotychczasowy savePhoneContactIn. Komunikaty błędów są te same.
 export async function savePhoneContact(
   contact: PhoneContact,
   call: PhoneCall | null,
   amount: number | null | undefined,
 ) {
-  return savePhoneContactIn(db, auth.currentUser, contact, call, amount);
+  try {
+    const r = await api("POST", "/telefonia/kontakty", {
+      contact,
+      call,
+      ...(amount !== undefined ? { amount } : {}),
+    });
+    zmieniono("telefonia");
+    return r.id as string;
+  } catch (e) {
+    throw new Error(e instanceof BladApi ? e.message : "Nie udało się zapisać kontaktu.");
+  }
 }
+
 export async function savePhoneReport(report: Omit<PhoneReport, "id">) {
-  if (!canAccessStats(auth.currentUser?.email))
-    throw new Error("Brak dostępu do raportów.");
-  await addDoc(collection(db, "phoneReports"), {
-    ...report,
-    createdBy: auth.currentUser!.uid,
-    createdAt: serverTimestamp(),
-  });
+  try {
+    await api("POST", "/telefonia/raporty", report);
+    zmieniono("telefonia");
+  } catch (e) {
+    throw new Error(e instanceof BladApi && e.status === 403 ? "Brak dostępu do raportów." : (e as Error).message);
+  }
+}
+
+// Treść materiału źródłowego importu (pobierana dopiero przy kliknięciu „Pobierz”).
+export async function pobierzTrescZrodla(id: string): Promise<{ format: string; content: string }> {
+  return api("GET", `/telefonia/zrodla/${encodeURIComponent(id)}`);
 }

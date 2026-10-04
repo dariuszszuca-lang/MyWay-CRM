@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Patient, QueuePatient, Payment, getAmountDue, formatCurrency } from './types';
 import PatientForm from './components/PatientForm';
 import PatientList from './components/PatientList';
@@ -8,7 +8,8 @@ import Login from './components/Login';
 import StatsDashboard from './components/StatsDashboard';
 import RoomsTab from './components/RoomsTab';
 import ReportsTab from './components/ReportsTab';
-import { Activity, Users, Cloud, RefreshCw, LogOut, Clock, BarChart3, AlertTriangle, BedDouble, FileText } from 'lucide-react';
+const TelefonyTab = lazy(() => import('./components/TelefonyTab'));
+import { Activity, Users, Cloud, RefreshCw, LogOut, Clock, BarChart3, AlertTriangle, BedDouble, FileText, Phone } from 'lucide-react';
 import { Sesja, sesja as pobierzSesje, wyloguj } from './services/aws/auth';
 import { nasluchuj, ustawObslugeWygasniecia } from './services/aws/api';
 import { AWS_CONFIG } from './services/aws/config';
@@ -21,8 +22,8 @@ import {
 // Gałąź aws: dane i logowanie na koncie AWS MyWay (Frankfurt).
 // Maile do pacjentów, listy GetResponse i synchronizacja z MyWayPoint działają jak w obecnym CRM
 // (te same funkcje myway-point-app), z jednym wyjątkiem: w ośrodkach testowych są wyłączone,
-// żeby fikcyjne dane nie trafiały do prawdziwych list i skrzynek. Jeszcze nieprzeniesione: Telefony, Dziennik.
-type ActiveTab = 'form' | 'list' | 'queue' | 'stats' | 'rooms' | 'reports';
+// żeby fikcyjne dane nie trafiały do prawdziwych list i skrzynek. Jeszcze nieprzeniesiony: Dziennik.
+type ActiveTab = 'form' | 'list' | 'queue' | 'stats' | 'rooms' | 'reports' | 'telefony';
 
 const komunikat = (e: unknown) => (e instanceof Error ? e.message : 'Nieznany błąd.');
 
@@ -417,6 +418,13 @@ const App: React.FC = () => {
                 <FileText className="w-4 h-4" />
                 Raporty
               </button>
+
+              <button
+                onClick={() => switchTab('telefony')}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
+                  activeTab === 'telefony' ? 'bg-teal-50 text-teal-700 border border-teal-200' : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              ><Phone className="w-4 h-4" />Telefony</button>
             </nav>
         </div>
       </header>
@@ -505,6 +513,12 @@ const App: React.FC = () => {
                 </div>
                 <PatientForm onSubmit={handleAddPatient} prefillFromQueue={prefillQueue || undefined} allPatients={patients} onLoadFullPatient={handleLoadFullPatient} />
               </div>
+            )}
+
+            {activeTab === 'telefony' && (
+              <Suspense fallback={<p role="status" className="py-10 text-center text-gray-500">Wczytywanie telefonów…</p>}>
+                <TelefonyTab canStats={canViewStats} owner={user.nazwa || user.email} />
+              </Suspense>
             )}
 
             {activeTab === 'list' && (
