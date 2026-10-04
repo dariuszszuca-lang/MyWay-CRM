@@ -36,9 +36,8 @@ const QueueList: React.FC<QueueListProps> = ({ queue, onUpdateQueue, onDeleteQue
   };
 
   const handleDelete = (patient: QueuePatient) => {
-    if (window.confirm(`Czy na pewno chcesz USUNĄĆ ${patient.firstName} ${patient.lastName} z kolejki? Tej operacji nie można cofnąć.`)) {
-      onDeleteQueue(patient.id);
-    }
+    // AWS: o powód usunięcia pyta App (wpis zostaje w bazie jako usunięty, z autorem i powodem).
+    onDeleteQueue(patient.id);
   };
 
   // Filter and sort
@@ -238,7 +237,7 @@ const QueueList: React.FC<QueueListProps> = ({ queue, onUpdateQueue, onDeleteQue
                   <button
                     onClick={() => handleDelete(patient)}
                     className="px-3 py-2 bg-white border border-red-200 text-red-500 text-sm rounded-lg hover:bg-red-50 transition-colors"
-                    title="Usuń na stałe"
+                    title="Usuń z kolejki (wymaga podania powodu)"
                   >
                     <XCircle className="w-4 h-4" />
                   </button>
