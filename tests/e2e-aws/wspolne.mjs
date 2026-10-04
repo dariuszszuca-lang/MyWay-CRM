@@ -44,10 +44,15 @@ export async function zaloguj(strona, k) {
   await strona.getByLabel('E-mail').fill(k.email);
   await strona.getByLabel('Hasło').fill(k.haslo);
   await strona.getByRole('button', { name: 'Zaloguj się' }).click();
-  await strona.getByRole('heading', { name: 'Kod z telefonu' }).waitFor({ timeout: 20000 });
-  await strona.getByLabel('Kod z aplikacji').fill(await swiezyKod(k.totp));
-  await strona.getByRole('button', { name: 'Wejdź' }).click();
-  await strona.getByRole('navigation', { name: 'Menu główne' }).waitFor({ timeout: 20000 });
+  // Kod z telefonu jest opcjonalny: pytane są o niego tylko konta, które go ustawiły.
+  const kod = strona.getByRole('heading', { name: 'Kod z telefonu' });
+  const menu = strona.getByRole('navigation', { name: 'Menu główne' });
+  await kod.or(menu).first().waitFor({ timeout: 20000 });
+  if (await kod.isVisible()) {
+    await strona.getByLabel('Kod z aplikacji').fill(await swiezyKod(k.totp));
+    await strona.getByRole('button', { name: 'Wejdź' }).click();
+  }
+  await menu.waitFor({ timeout: 20000 });
 }
 
 const wyniki = [];

@@ -64,7 +64,7 @@ const Login: React.FC<LoginProps> = ({ permissionError, onZalogowano }) => {
   const naglowek: Record<Ekran, { tytul: string; opis: string }> = {
     'haslo': { tytul: 'Witaj ponownie', opis: 'Zaloguj się, aby uzyskać dostęp do bazy' },
     'nowe-haslo': { tytul: 'Ustaw własne hasło', opis: 'Pierwsze logowanie: zamień hasło tymczasowe na swoje' },
-    'ustaw-kod': { tytul: 'Dodaj kod w telefonie', opis: 'Jednorazowa konfiguracja. Od teraz każde logowanie wymaga kodu z aplikacji.' },
+    'ustaw-kod': { tytul: 'Dodaj kod w telefonie', opis: 'Jednorazowa konfiguracja dodatkowego zabezpieczenia konta.' },
     'podaj-kod': { tytul: 'Kod z telefonu', opis: 'Wpisz 6 cyfr z aplikacji z kodami (wpis „MyWay CRM”)' },
   };
 
@@ -174,7 +174,7 @@ const Login: React.FC<LoginProps> = ({ permissionError, onZalogowano }) => {
 
           <div className="mt-6 flex items-center justify-center gap-2 text-xs text-gray-400">
             <ShieldCheck className="w-3 h-3" aria-hidden="true" />
-            <span>Logowanie z kodem z telefonu. Dane w Unii Europejskiej (Frankfurt).</span>
+            <span>Bezpieczne logowanie. Dane w Unii Europejskiej (Frankfurt).</span>
           </div>
         </div>
       </div>

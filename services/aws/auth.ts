@@ -1,4 +1,5 @@
-// Logowanie do CRM przez Amazon Cognito: e-mail + hasło + kod z aplikacji w telefonie (obowiązkowy).
+// Logowanie do CRM przez Amazon Cognito: e-mail + hasło. Kod z aplikacji w telefonie jest opcjonalny
+// (decyzja Darka 04.10.2026): pytamy o niego tylko konta, które go ustawiły.
 // Tokeny trzymamy w sessionStorage: znikają po zamknięciu karty przeglądarki.
 import {
   AuthenticationDetails, CognitoUser, CognitoUserPool, CognitoUserSession,
