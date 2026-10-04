@@ -16,7 +16,8 @@ try {
   sprawdz('logowanie z kodem z telefonu: wejście do CRM', await strona.getByRole('navigation', { name: 'Menu główne' }).isVisible());
   sprawdz('nagłówek pokazuje zalogowany e-mail', (await strona.locator('header').innerText()).includes('crm-test-1@example.com'));
   const menu = await strona.getByRole('navigation', { name: 'Menu główne' }).innerText();
-  sprawdz('menu: bez Statystyk (konto bez grupy), bez Dziennika i Telefonów', !/Statystyki|Dziennik|Telefony/.test(menu), menu.replace(/\n/g, ' | '));
+  sprawdz('menu jak w obecnym CRM: Rejestracja, Baza, Kolejka, Pokoje, Raporty, Dziennik, Telefony; bez Statystyk dla konta bez grupy',
+    ['Rejestracja', 'Baza', 'Kolejka', 'Pokoje', 'Raporty', 'Dziennik', 'Telefony'].every((x) => menu.includes(x)) && !menu.includes('Statystyki'), menu.replace(/\n/g, ' | '));
   sprawdz('brak przycisku „Kopia” (pobranie całej bazy)', (await strona.getByRole('button', { name: /Kopia|kopię bazy/ }).count()) === 0);
 
   await strona.getByRole('button', { name: /Baza \(/ }).click();

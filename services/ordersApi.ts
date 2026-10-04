@@ -4,7 +4,7 @@
 // dokładamy token zalogowanego użytkownika CRM, funkcja sprawdza go po stronie serwera
 // i porównuje mail z listą dostępu. Spec: klienci/myway/projekty/dziennik-panel-zamowien/SPEC.md
 
-import { auth } from '../firebaseConfig';
+import { sesja } from './aws/auth';
 import { Order, OrderStatus, PromoCode } from '../types';
 
 const ORDERS_API_URL = 'https://europe-west1-eduway-f13c4.cloudfunctions.net/ordersApi';
@@ -17,12 +17,14 @@ interface StatusChangeResult {
 }
 
 async function authorizedFetch(body: Record<string, unknown> | null, action: string): Promise<any> {
-  const user = auth.currentUser;
-  if (!user) {
+  // AWS: token tożsamości z nowego logowania (Cognito). Funkcja ordersApi sprawdza jego podpis
+  // i porównuje e-mail z tą samą listą dostępu co dotąd.
+  const s = await sesja();
+  if (!s) {
     throw new Error('Nie jesteś zalogowany. Odśwież stronę i zaloguj się ponownie.');
   }
 
-  const token = await user.getIdToken();
+  const token = s.tokenTozsamosci;
   const isPost = body !== null;
 
   const response = await fetch(isPost ? ORDERS_API_URL : `${ORDERS_API_URL}?action=${action}`, {

@@ -8,8 +8,9 @@ import Login from './components/Login';
 import StatsDashboard from './components/StatsDashboard';
 import RoomsTab from './components/RoomsTab';
 import ReportsTab from './components/ReportsTab';
+import DziennikTab from './components/DziennikTab';
 const TelefonyTab = lazy(() => import('./components/TelefonyTab'));
-import { Activity, Users, Cloud, RefreshCw, LogOut, Clock, BarChart3, AlertTriangle, BedDouble, FileText, Phone } from 'lucide-react';
+import { Activity, Users, Cloud, RefreshCw, LogOut, Clock, BarChart3, AlertTriangle, BedDouble, FileText, Package, Phone } from 'lucide-react';
 import { Sesja, sesja as pobierzSesje, wyloguj } from './services/aws/auth';
 import { nasluchuj, ustawObslugeWygasniecia } from './services/aws/api';
 import { AWS_CONFIG } from './services/aws/config';
@@ -22,8 +23,9 @@ import {
 // Gałąź aws: dane i logowanie na koncie AWS MyWay (Frankfurt).
 // Maile do pacjentów, listy GetResponse i synchronizacja z MyWayPoint działają jak w obecnym CRM
 // (te same funkcje myway-point-app), z jednym wyjątkiem: w ośrodkach testowych są wyłączone,
-// żeby fikcyjne dane nie trafiały do prawdziwych list i skrzynek. Jeszcze nieprzeniesiony: Dziennik.
-type ActiveTab = 'form' | 'list' | 'queue' | 'stats' | 'rooms' | 'reports' | 'telefony';
+// żeby fikcyjne dane nie trafiały do prawdziwych list i skrzynek.
+// Dziennik: te same zamówienia z projektu EduWay (ordersApi), autoryzacja tokenem z nowego logowania.
+type ActiveTab = 'form' | 'list' | 'queue' | 'stats' | 'rooms' | 'reports' | 'dziennik' | 'telefony';
 
 const komunikat = (e: unknown) => (e instanceof Error ? e.message : 'Nieznany błąd.');
 
@@ -420,6 +422,18 @@ const App: React.FC = () => {
               </button>
 
               <button
+                onClick={() => switchTab('dziennik')}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
+                  activeTab === 'dziennik'
+                    ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <Package className="w-4 h-4" />
+                Dziennik
+              </button>
+
+              <button
                 onClick={() => switchTab('telefony')}
                 className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
                   activeTab === 'telefony' ? 'bg-teal-50 text-teal-700 border border-teal-200' : 'text-gray-600 hover:bg-gray-100'
@@ -512,6 +526,16 @@ const App: React.FC = () => {
                   )}
                 </div>
                 <PatientForm onSubmit={handleAddPatient} prefillFromQueue={prefillQueue || undefined} allPatients={patients} onLoadFullPatient={handleLoadFullPatient} />
+              </div>
+            )}
+
+            {activeTab === 'dziennik' && (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold text-gray-800">Dziennik</h2>
+                  <p className="text-gray-500">Zamówienia ze sklepu edu-myway.pl i kody na darmowy Dziennik. Zmiana statusu wysyła maila do klienta.</p>
+                </div>
+                <DziennikTab />
               </div>
             )}
 

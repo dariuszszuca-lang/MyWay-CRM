@@ -18,6 +18,8 @@ export interface Sesja {
   konto: string;
   grupy: string[];
   token: string;
+  // Token tożsamości (z e-mailem): dla funkcji ordersApi w EduWay, która sprawdza adres na liście dostępu.
+  tokenTozsamosci: string;
 }
 
 export type KrokLogowania =
@@ -37,6 +39,7 @@ const naSesje = (s: CognitoUserSession): Sesja => {
     konto: String(dostep.payload.sub),
     grupy: (dostep.payload['cognito:groups'] as string[]) || [],
     token: dostep.getJwtToken(),
+    tokenTozsamosci: s.getIdToken().getJwtToken(),
   };
 };
 
