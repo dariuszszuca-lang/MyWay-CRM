@@ -26,6 +26,12 @@ service cloud.firestore {
       ];
     }
 
+    // 05.10.2026: CRM przeniesiony na AWS. Ta baza jest ARCHIWUM: zespol tylko czyta,
+    // zapis zostaje wylacznie dla administratora (sprawdzanie dzialania starej wersji).
+    function piszacy() {
+      return czlonekZespolu() && request.auth.token.email.lower() == 'dariusz.szuca@gmail.com';
+    }
+
     function czlonekZespolu() {
       return request.auth != null
         && request.auth.token.email != null
@@ -34,16 +40,20 @@ service cloud.firestore {
     }
 
     match /patients/{patientId} {
-      allow read, write: if czlonekZespolu();
+      allow read: if czlonekZespolu();
+      allow write: if piszacy();
     }
     match /queue/{queueId} {
-      allow read, write: if czlonekZespolu();
+      allow read: if czlonekZespolu();
+      allow write: if piszacy();
     }
     match /rooms/{roomId} {
-      allow read, write: if czlonekZespolu();
+      allow read: if czlonekZespolu();
+      allow write: if piszacy();
     }
     match /roomAssignments/{assignmentId} {
-      allow read, write: if czlonekZespolu();
+      allow read: if czlonekZespolu();
+      allow write: if piszacy();
     }
 
     // Phone module. Financial amounts and report archives have a narrower audience.
@@ -84,12 +94,12 @@ service cloud.firestore {
     }
     match /phoneContacts/{id} {
       allow read: if czlonekZespolu();
-      allow create: if czlonekZespolu() && phoneContactValid(request.resource.data)
+      allow create: if piszacy() && phoneContactValid(request.resource.data)
         && !request.resource.data.get('historical', false)
         && request.resource.data.revision == 1
         && request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time
         && phoneHasAudit(id, 1);
-      allow update: if czlonekZespolu() && phoneContactValid(request.resource.data)
+      allow update: if piszacy() && phoneContactValid(request.resource.data)
         && request.resource.data.get('historical', false) == resource.data.get('historical', false)
         && request.resource.data.revision == resource.data.revision + 1
         && request.resource.data.createdBy == resource.data.createdBy
@@ -99,7 +109,7 @@ service cloud.firestore {
     }
     match /phoneCalls/{id} {
       allow read: if czlonekZespolu();
-      allow create: if czlonekZespolu()
+      allow create: if piszacy()
         && request.resource.data.keys().hasOnly(['contactId','date','time','kind','durationSeconds','result','answered','fullConversation','callback','note','createdBy','createdAt'])
         && request.resource.data.contactId is string
         && phoneDate(request.resource.data.date) && phoneTime(request.resource.data.time)
@@ -117,7 +127,7 @@ service cloud.firestore {
     }
     match /phoneAudit/{id} {
       allow read: if czlonekZespolu();
-      allow create: if czlonekZespolu()
+      allow create: if piszacy()
         && request.resource.data.keys().hasOnly(['contactId','revision','action','before','after','createdBy','createdAt'])
         && request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time
         && request.resource.data.action in ['Rozmowa','Edycja kontaktu']
@@ -129,7 +139,7 @@ service cloud.firestore {
     }
     match /phoneFinancials/{id} {
       allow read: if phoneStats();
-      allow create, update: if phoneStats()
+      allow create, update: if piszacy() && phoneStats()
         && request.resource.data.keys().hasOnly(['amount','updatedBy','updatedAt'])
         && (request.resource.data.amount == null || (request.resource.data.amount is number && request.resource.data.amount >= 0 && request.resource.data.amount <= 10000000))
         && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time
@@ -138,7 +148,7 @@ service cloud.firestore {
     }
     match /phoneFinancialAudit/{id} {
       allow read: if phoneStats();
-      allow create: if phoneStats()
+      allow create: if piszacy() && phoneStats()
         && request.resource.data.keys().hasOnly(['contactId','revision','before','after','createdBy','createdAt'])
         && request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time
         && getAfter(/databases/$(database)/documents/phoneContacts/$(request.resource.data.contactId)).data.revision == request.resource.data.revision
@@ -147,7 +157,7 @@ service cloud.firestore {
     }
     match /phoneReports/{id} {
       allow read: if phoneStats();
-      allow create: if phoneStats() && request.resource.data.keys().hasOnly(['kind','from','to','summary','filters','generatedAt','automatic','createdBy','createdAt'])
+      allow create: if piszacy() && phoneStats() && request.resource.data.keys().hasOnly(['kind','from','to','summary','filters','generatedAt','automatic','createdBy','createdAt'])
         && request.resource.data.kind in ['day','week','month','year','custom']
         && phoneDate(request.resource.data.from) && phoneDate(request.resource.data.to) && request.resource.data.from <= request.resource.data.to
         && request.resource.data.summary is map && request.resource.data.filters is map
