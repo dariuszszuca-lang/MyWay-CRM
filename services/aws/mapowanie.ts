@@ -69,11 +69,22 @@ function uslugiZLicznikow(wg: Record<string, { ile: number; kwota: number }> | u
   return out;
 }
 
-export const wplataZApi = (w: any): Payment => ({ id: w.id, cancelled: Boolean(w.anulowano), amount: w.kwota, date: w.data, method: w.metoda, purpose: w.cel || undefined });
-export const uslugaZApi = (u: any): AdditionalService => ({ id: u.id, cancelled: Boolean(u.anulowano), type: u.typ, date: u.data, amount: u.kwota, note: u.notatka || undefined });
+export const wplataZApi = (w: any): Payment => ({ id: w.id, cancelled: Boolean(w.anulowano), amount: w.kwota, date: w.data, method: w.metoda, purpose: w.cel || undefined, category: w.kategoria || undefined, docNo: w.docNo });
+export const uslugaZApi = (u: any): AdditionalService => ({
+  id: u.id, cancelled: Boolean(u.anulowano), type: u.typ, date: u.data, amount: u.kwota, note: u.notatka || undefined,
+  weeks: u.tygodnie, extensionStart: u.poczatekPrzedluzenia || undefined, newEndDate: u.nowyKoniec || undefined, paymentDeadline: u.terminPlatnosci || undefined,
+  paidDate: u.dataWplaty || undefined, paidMethod: u.formaWplaty || undefined, paymentStatus: u.statusPlatnosci || undefined, docNo: u.docNo,
+});
 
-export const wplataDoApi = (w: Payment) => ({ kwota: w.amount, data: w.date || dzis(), metoda: w.method || 'przelew', ...(w.purpose ? { cel: w.purpose } : {}) });
-export const uslugaDoApi = (u: AdditionalService) => ({ typ: u.type, data: u.date || dzis(), kwota: u.amount || 0, ...(u.note ? { notatka: u.note } : {}) });
+export const wplataDoApi = (w: Payment) => ({ kwota: w.amount, data: w.date || dzis(), metoda: w.method || 'przelew', ...(w.purpose ? { cel: w.purpose } : {}), ...(w.category ? { kategoria: w.category } : {}) });
+export const uslugaDoApi = (u: AdditionalService) => ({
+  typ: u.type, data: u.date || dzis(), kwota: u.amount || 0, ...(u.note ? { notatka: u.note } : {}),
+  ...(u.type === 'przedluzenie' && u.weeks ? { tygodnie: Number(u.weeks) } : {}),
+  ...(u.type === 'przedluzenie' && u.extensionStart ? { poczatekPrzedluzenia: u.extensionStart } : {}),
+  ...(u.type === 'przedluzenie' && u.newEndDate ? { nowyKoniec: u.newEndDate } : {}),
+  ...(u.paymentDeadline ? { terminPlatnosci: u.paymentDeadline } : {}), ...(u.paidDate ? { dataWplaty: u.paidDate } : {}),
+  ...(u.paidMethod ? { formaWplaty: u.paidMethod } : {}), ...(u.paymentStatus ? { statusPlatnosci: u.paymentStatus } : {}),
+});
 
 // Pola karty, które przyjmuje API (bez wpłat, usług, statusu i wypisu: te mają własne operacje).
 export function pacjentDoApi(p: Patient): Record<string, unknown> {

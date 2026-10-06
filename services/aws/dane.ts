@@ -37,16 +37,20 @@ export async function pobierzPacjentow(): Promise<Patient[]> {
 export async function pobierzPelnego(id: string): Promise<Patient> {
   const [karta, finanse] = await Promise.all([api('GET', `/pacjenci/${id}`), api('GET', `/pacjenci/${id}/finanse`)]);
   const p = pacjentZApi(karta, true);
-  p.payments = (finanse.wplaty || []).filter((w: any) => !w.anulowano).map(wplataZApi);
-  p.additionalServices = (finanse.uslugi || []).filter((u: any) => !u.anulowano).map(uslugaZApi);
+  // Numer kolejny wpisu na karcie (wg czasu zapisu, razem z anulowanymi): z niego powstaje numer potwierdzenia wpłaty i aneksu.
+  const numeruj = (lista: any[]) => [...lista].sort((a, b) => String(a.utworzono || '').localeCompare(String(b.utworzono || ''))).map((w, i) => ({ ...w, docNo: i + 1 }));
+  p.payments = numeruj(finanse.wplaty || []).filter((w: any) => !w.anulowano).map(wplataZApi).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  p.additionalServices = numeruj(finanse.uslugi || []).filter((u: any) => !u.anulowano).map(uslugaZApi).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   p.amountPaid = finanse.sumaWplat ?? 0;
   p.sumaUslug = finanse.sumaUslug ?? 0;
   pelneKarty.set(id, kopia(p));
   return p;
 }
 
-const tasama = (a: Payment, b: Payment) => a.amount === b.amount && (a.date || '') === (b.date || '') && a.method === b.method && (a.purpose || '') === (b.purpose || '');
-const tasamaUsluga = (a: AdditionalService, b: AdditionalService) => a.type === b.type && a.amount === b.amount && (a.date || '') === (b.date || '') && (a.note || '') === (b.note || '');
+const tasama = (a: Payment, b: Payment) => a.amount === b.amount && (a.date || '') === (b.date || '') && a.method === b.method && (a.purpose || '') === (b.purpose || '') && (a.category || '') === (b.category || '');
+const tasamaUsluga = (a: AdditionalService, b: AdditionalService) => a.type === b.type && a.amount === b.amount && (a.date || '') === (b.date || '') && (a.note || '') === (b.note || '')
+  && (a.weeks || 0) === (b.weeks || 0) && (a.extensionStart || '') === (b.extensionStart || '') && (a.newEndDate || '') === (b.newEndDate || '') && (a.paymentDeadline || '') === (b.paymentDeadline || '')
+  && (a.paidDate || '') === (b.paidDate || '') && (a.paidMethod || '') === (b.paidMethod || '') && (a.paymentStatus || '') === (b.paymentStatus || '');
 
 // Różnica list wpłat albo usług: wpis usunięty albo zmieniony = storno starego, nowy albo zmieniony = dodanie.
 async function zapiszFinanse(id: string, stare: Patient, nowe: Patient) {

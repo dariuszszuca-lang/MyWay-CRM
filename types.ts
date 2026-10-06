@@ -60,12 +60,22 @@ export interface Patient {
   sumaUslug?: number;
 }
 
+export type PaymentCategory = 'zadatek' | 'terapia' | 'przedluzenie' | 'usluga' | 'korekta';
+export const PAYMENT_CATEGORY_LABELS: Record<PaymentCategory, string> = {
+  zadatek: 'Zadatek', terapia: 'Płatność za terapię', przedluzenie: 'Przedłużenie pobytu', usluga: 'Usługa dodatkowa', korekta: 'Korekta',
+};
+export type ServicePaymentStatus = 'nieoplacone' | 'czesciowo' | 'oplacone';
+export const SERVICE_PAYMENT_STATUS_LABELS: Record<ServicePaymentStatus, string> = { nieoplacone: 'Nieopłacone', czesciowo: 'Częściowo opłacone', oplacone: 'Opłacone' };
+export const PAYMENT_METHOD_LABELS: Record<string, string> = { przelew: 'przelew', gotowka: 'gotówka', karta: 'karta', przedplata: 'przedpłata' };
+
 export interface Payment {
   id?: string;        // AWS: identyfikator wpisu (brak = nowa wpłata do zapisania)
   cancelled?: boolean; // AWS: wpłata anulowana (storno), zostaje w historii
   amount: number;
   date: string;
   method: 'przelew' | 'gotowka' | 'karta' | 'przedplata';
+  category?: PaymentCategory; // kategoria wpłaty (specyfikacja 06.10.2026)
+  docNo?: number;     // AWS: kolejny numer wpisu na karcie (do numeru potwierdzenia wpłaty)
   purpose?: string; // Za co wpłata (np. kroplówka, recepta, dopłata do pakietu) — opcjonalne dla zgodności wstecz
 }
 
@@ -78,6 +88,15 @@ export interface AdditionalService {
   date: string;
   amount: number;
   note?: string;
+  // Rozliczenie usługi i przedłużenia (specyfikacja 06.10.2026); wszystkie opcjonalne.
+  weeks?: 1 | 2 | 3;            // przedłużenie: liczba dodatkowych tygodni
+  extensionStart?: string;      // przedłużenie: data rozpoczęcia
+  newEndDate?: string;          // przedłużenie: nowa data zakończenia pobytu
+  paymentDeadline?: string;
+  paidDate?: string;
+  paidMethod?: Payment['method'];
+  paymentStatus?: ServicePaymentStatus;
+  docNo?: number;               // AWS: kolejny numer wpisu na karcie (do numeru aneksu)
 }
 
 export const SERVICE_TYPE_LABELS: Record<AdditionalServiceType, string> = {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Patient, Payment, QueuePatient, AdditionalService, SERVICE_TYPE_LABELS, formatCurrency, isPackageWithoutBase, packageLabel } from '../types';
+import { generatePaymentConfirmation, generateAnnex } from '../services/contractDocuments';
 import type { AdditionalServiceType } from '../types';
 import { PlusCircle, Calculator, Save, X, Trash2, Search, UserCheck, Stethoscope } from 'lucide-react';
 
@@ -220,6 +221,24 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
 
   const updateService = (index: number, field: keyof AdditionalService, value: string | number) => {
     setServices(prev => prev.map((s, i) => i === index ? { ...s, [field]: field === 'amount' ? Number(value) : value } : s));
+  };
+
+  // Przedłużenie pobytu: liczba tygodni i data rozpoczęcia wyliczają nową datę zakończenia,
+  // a ta od razu przesuwa koniec terapii w karcie (specyfikacja: „przedłużenie zmienia datę zakończenia pobytu").
+  const plusDni = (data: string, dni: number) => { const d = new Date(`${data}T12:00:00`); d.setDate(d.getDate() + dni); return d.toISOString().split('T')[0]; };
+  const updateExtension = (index: number, patch: Partial<AdditionalService>) => {
+    const obecna = { ...services[index], ...patch };
+    const start = obecna.extensionStart || formData.treatmentEndDate || '';
+    const nowyKoniec = patch.newEndDate !== undefined ? patch.newEndDate : (obecna.weeks && start ? plusDni(start, obecna.weeks * 7) : obecna.newEndDate);
+    setServices(prev => prev.map((s, i) => i === index ? { ...s, ...patch, extensionStart: start || undefined, newEndDate: nowyKoniec || undefined } : s));
+    if (nowyKoniec && nowyKoniec > (formData.treatmentEndDate || '')) setFormData(prev => ({ ...prev, treatmentEndDate: nowyKoniec }));
+  };
+
+  // Dokumenty do umowy drukuje się z zapisanych wpisów (mają numer) i tylko gdy umowa ma już numer.
+  const dokumentZapisany = (wpis: { id?: string; docNo?: number }) => {
+    if (!initialData || !wpis.id || !wpis.docNo) { alert('Najpierw zapisz kartę: dokument drukuje się z zapisanego wpisu.'); return false; }
+    if (!initialData.contractNumber) { alert('Ta karta nie ma jeszcze numeru umowy. Najpierw wydrukuj umowę (przycisk „Umowa” na liście): wtedy nadaje się numer i wybiera spółkę.'); return false; }
+    return true;
   };
 
   const totalServices = services.reduce((sum, s) => sum + (s.amount || 0), 0);
@@ -469,9 +488,22 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
                         <Trash2 size={14} />
                       </button>
                     </div>
-                    <div className="mb-3">
-                      <label className="text-xs text-gray-600 font-semibold mb-1 block">Za co</label>
-                      <input type="text" value={payment.purpose || ''} onChange={(e) => updatePayment(index, 'purpose', e.target.value)} className={inputClass} placeholder="opis wpłaty (opcjonalnie)" />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+                      <div>
+                        <label className="text-xs text-gray-600 font-semibold mb-1 block">Kategoria</label>
+                        <select value={payment.category || ''} onChange={(e) => updatePayment(index, 'category', e.target.value)} className={inputClass}>
+                          <option value="">(nie wybrano)</option>
+                          <option value="zadatek">Zadatek</option>
+                          <option value="terapia">Płatność za terapię</option>
+                          <option value="przedluzenie">Przedłużenie pobytu</option>
+                          <option value="usluga">Usługa dodatkowa</option>
+                          <option value="korekta">Korekta</option>
+                        </select>
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="text-xs text-gray-600 font-semibold mb-1 block">Za co</label>
+                        <input type="text" value={payment.purpose || ''} onChange={(e) => updatePayment(index, 'purpose', e.target.value)} className={inputClass} placeholder="opis wpłaty (opcjonalnie)" />
+                      </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
@@ -492,6 +524,12 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
                         </select>
                       </div>
                     </div>
+                    {initialData && payment.id && (
+                      <button type="button" onClick={() => { if (dokumentZapisany(payment)) generatePaymentConfirmation({ ...(initialData as Patient), payments, additionalServices: services }, payment); }}
+                        className="mt-3 text-xs font-semibold text-teal-700 underline hover:text-teal-900">
+                        Drukuj potwierdzenie wpłaty
+                      </button>
+                    )}
                   </div>
                 ))}
 
@@ -550,6 +588,61 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
                         <input type="text" value={service.note || ''} onChange={(e) => updateService(index, 'note', e.target.value)} className={inputClass} placeholder="np. nazwa leku" />
                       </div>
                     </div>
+                    {service.type === 'przedluzenie' && (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+                        <div>
+                          <label className="text-xs text-gray-600 font-semibold mb-1 block">Dodatkowe tygodnie</label>
+                          <select value={service.weeks || ''} onChange={(e) => updateExtension(index, { weeks: (Number(e.target.value) || undefined) as 1 | 2 | 3 | undefined })} className={inputClass}>
+                            <option value="">(wybierz)</option>
+                            <option value="1">1 tydzień</option>
+                            <option value="2">2 tygodnie</option>
+                            <option value="3">3 tygodnie</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-600 font-semibold mb-1 block">Początek przedłużenia</label>
+                          <input type="date" value={service.extensionStart || ''} onChange={(e) => updateExtension(index, { extensionStart: e.target.value })} className={inputClass} />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-600 font-semibold mb-1 block">Nowa data zakończenia</label>
+                          <input type="date" value={service.newEndDate || ''} onChange={(e) => updateExtension(index, { newEndDate: e.target.value })} className={inputClass} />
+                        </div>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-3">
+                      <div>
+                        <label className="text-xs text-gray-600 font-semibold mb-1 block">Termin płatności</label>
+                        <input type="date" value={service.paymentDeadline || ''} onChange={(e) => updateService(index, 'paymentDeadline', e.target.value)} className={inputClass} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600 font-semibold mb-1 block">Status płatności</label>
+                        <select value={service.paymentStatus || ''} onChange={(e) => updateService(index, 'paymentStatus', e.target.value)} className={inputClass}>
+                          <option value="">(nie wybrano)</option>
+                          <option value="nieoplacone">Nieopłacone</option>
+                          <option value="czesciowo">Częściowo opłacone</option>
+                          <option value="oplacone">Opłacone</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600 font-semibold mb-1 block">Data wpłaty</label>
+                        <input type="date" value={service.paidDate || ''} onChange={(e) => updateService(index, 'paidDate', e.target.value)} className={inputClass} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600 font-semibold mb-1 block">Forma płatności</label>
+                        <select value={service.paidMethod || ''} onChange={(e) => updateService(index, 'paidMethod', e.target.value)} className={inputClass}>
+                          <option value="">(nie wybrano)</option>
+                          <option value="przelew">Przelew</option>
+                          <option value="gotowka">Gotówka</option>
+                          <option value="karta">Karta</option>
+                        </select>
+                      </div>
+                    </div>
+                    {initialData && service.id && (
+                      <button type="button" onClick={() => { if (dokumentZapisany(service)) generateAnnex({ ...(initialData as Patient), payments, additionalServices: services }, service); }}
+                        className="mt-3 text-xs font-semibold text-purple-700 underline hover:text-purple-900">
+                        Drukuj aneks
+                      </button>
+                    )}
                   </div>
                 ))}
 
