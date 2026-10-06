@@ -4,16 +4,18 @@ import { usePokoje } from '../services/roomsService';
 import PatientsInResidenceReport from './PatientsInResidenceReport';
 import AdmissionsReport from './AdmissionsReport';
 import DischargesReport from './DischargesReport';
-import { Users, LogIn, LogOut } from 'lucide-react';
+import SettlementsReport from './SettlementsReport';
+import { Users, LogIn, LogOut, Wallet } from 'lucide-react';
 
 interface Props {
   patients: Patient[];
   queue?: QueuePatient[];
+  canStats?: boolean; // raport rozliczeń tylko dla kont ze statystykami
 }
 
-type SubTab = 'residence' | 'admissions' | 'discharges';
+type SubTab = 'residence' | 'admissions' | 'discharges' | 'settlements';
 
-const ReportsTab: React.FC<Props> = ({ patients, queue = [] }) => {
+const ReportsTab: React.FC<Props> = ({ patients, queue = [], canStats = false }) => {
   // AWS: pokoje i przydziały z API, odświeżane co 20 s i po każdej zmianie.
   const { rooms, assignments } = usePokoje();
   const [subTab, setSubTab] = useState<SubTab>('residence');
@@ -38,6 +40,7 @@ const ReportsTab: React.FC<Props> = ({ patients, queue = [] }) => {
         {tabBtn('residence', 'Pacjenci w ośrodku', Users)}
         {tabBtn('admissions', 'Raport przyjęć', LogIn)}
         {tabBtn('discharges', 'Raport wypisów', LogOut)}
+        {canStats && tabBtn('settlements', 'Rozliczenia i psychiatra', Wallet)}
       </div>
 
       {subTab === 'residence' && (
@@ -49,6 +52,7 @@ const ReportsTab: React.FC<Props> = ({ patients, queue = [] }) => {
       {subTab === 'discharges' && (
         <DischargesReport patients={patients} rooms={rooms} assignments={assignments} />
       )}
+      {subTab === 'settlements' && canStats && <SettlementsReport />}
     </div>
   );
 };

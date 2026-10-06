@@ -274,3 +274,17 @@ export async function zmienWizyte(id: string, wizytaId: string, zmiana: { status
   zmieniono('pacjenci');
   return r;
 }
+
+// ---------- Raport rozliczeń (tylko konta ze statystykami) ----------
+export interface RaportRozliczen {
+  pakiety: { liczba: number; wartosc: number };
+  wplaty: { liczba: number; suma: number; wgKategorii: Record<string, number>; wgFormy: Record<string, number> };
+  wplatyBezDaty: { liczba: number; suma: number };
+  naleznosci: { pacjentow: number; suma: number };
+  dodatkoweTygodnie: { liczba: number; suma: number };
+  uslugiDodatkowe: { liczba: number; suma: number; wgRodzaju: Record<string, number> };
+  psychiatra: { wPakiecie: number; platne: number; wartoscPlatnych: number };
+  nieoplaconeUslugi: { pacjent: string; typ: string; data: string; kwota: number; status: string; termin: string }[];
+  niewykorzystaneKonsultacje: { pacjent: string; pakiet: string; limit: number; wykorzystane: number; terapiaDo: string }[];
+}
+export const pobierzRaportRozliczen = (od: string, doDnia: string): Promise<RaportRozliczen> => api('GET', `/raporty/rozliczenia?od=${od}&do=${doDnia}`);
