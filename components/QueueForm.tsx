@@ -280,6 +280,8 @@ const QueueForm: React.FC<QueueFormProps> = ({ onSubmit, initialData, onCancel, 
                 <option value="8tyg_roz">8 tygodni rozszerzony</option>
                 <option value="interwencyjna">Terapia interwencyjna</option>
                 <option value="vip">Grupa VIP</option>
+                <option value="przyjazd_5tyg">Przyjazd 5. tydzień</option>
+                <option value="powrot_przerwa">Powrót z przerwy warunkowej</option>
               </select>
             </div>
             <div>

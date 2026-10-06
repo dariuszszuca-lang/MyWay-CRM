@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Patient, Payment, QueuePatient, AdditionalService, SERVICE_TYPE_LABELS, formatCurrency } from '../types';
+import { Patient, Payment, QueuePatient, AdditionalService, SERVICE_TYPE_LABELS, formatCurrency, isPackageWithoutBase, packageLabel } from '../types';
 import type { AdditionalServiceType } from '../types';
 import { PlusCircle, Calculator, Save, X, Trash2, Search, UserCheck, Stethoscope } from 'lucide-react';
 
@@ -247,7 +247,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
 
   const totalPaid = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
   const amountDue = formData.totalAmount + totalServices - totalPaid;
-  const isVip = formData.package === 'vip';
+  const isVip = isPackageWithoutBase(formData.package);
 
   // Styling enforcing white background and black text for inputs
   const inputClass = "p-2.5 border border-gray-300 rounded-lg w-full bg-white text-black placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all shadow-sm";
@@ -424,13 +424,19 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
                 <option value="8tyg_roz">8 tygodni rozszerzony</option>
                 <option value="interwencyjna">Terapia interwencyjna</option>
                 <option value="vip">Grupa VIP</option>
+                <option value="przyjazd_5tyg">Przyjazd 5. tydzień</option>
+                <option value="powrot_przerwa">Powrót z przerwy warunkowej</option>
               </select>
+            </div>
+            <div>
+              <label className={labelClass}>Nr umowy{isVip && formData.package !== 'vip' ? ' głównej' : ''}</label>
+              <input placeholder="np. 123/2026" name="contractNumber" maxLength={40} value={formData.contractNumber || ''} onChange={handleChange} className={inputClass} />
             </div>
           </div>
 
           {isVip && (
             <div className="mt-6 bg-purple-50 p-4 rounded-lg border border-purple-100 text-purple-700 font-medium text-sm">
-              Grupa VIP, pakiet bez kwoty do rozliczenia. Poniżej dopiszesz dodatkowe usługi i wpłaty za nie.
+              {packageLabel(formData.package)}, pakiet bez kwoty do rozliczenia. Poniżej dopiszesz dodatkowe usługi i wpłaty za nie.
             </div>
           )}
 

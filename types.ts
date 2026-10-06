@@ -16,7 +16,7 @@ export interface Patient {
   treatmentEndDate: string; // Data zakończenia terapii
   
   // Financial
-  package: '1' | '2' | '3' | '6tyg' | '8tyg' | '6tyg_roz' | '8tyg_roz' | 'interwencyjna' | 'vip';
+  package: PatientPackage;
   totalAmount: number;
   amountPaid: number; // Legacy — suma wpłat (backwards compat)
   paymentDeadline: string;
@@ -33,6 +33,7 @@ export interface Patient {
   hasWhatsapp: boolean;
   onlineConsultations: number;
   notes: string;
+  contractNumber?: string; // nr umowy: łączy przyjazd na 5. tydzień / powrót z przerwy z umową główną
 
   // Patient status
   status?: 'active' | 'discharged';
@@ -102,7 +103,7 @@ export interface QueuePatient {
   address?: string;
   voivodeship?: string;
   // Pakiet i zaliczka
-  package: '1' | '2' | '3' | '6tyg' | '8tyg' | '6tyg_roz' | '8tyg_roz' | 'interwencyjna' | 'vip';
+  package: PatientPackage;
   depositAmount: number;     // Wpłacona zaliczka
   depositDate: string;       // Data wpłaty zaliczki
   plannedStartDate: string;  // Planowany termin OD
@@ -151,9 +152,19 @@ export const getAmountDue = (patient: Patient): number => {
 // Pakiety terapii. JEDNO źródło nazw dla całej aplikacji.
 // Wcześniej te same etykiety były przepisane w sześciu miejscach i zdążyły się rozjechać:
 // raport przyjęć mówił „6 tyg. (rozłożony)", a reszta aplikacji „6 tyg. rozszerzony".
-export type PatientPackage = '1' | '2' | '3' | '6tyg' | '8tyg' | '6tyg_roz' | '8tyg_roz' | 'interwencyjna' | 'vip';
+export type PatientPackage = '1' | '2' | '3' | '6tyg' | '8tyg' | '6tyg_roz' | '8tyg_roz' | 'interwencyjna' | 'vip' | 'przyjazd_5tyg' | 'powrot_przerwa';
 
-export const PACKAGE_ORDER: PatientPackage[] = ['1', '2', '3', '6tyg', '8tyg', '6tyg_roz', '8tyg_roz', 'interwencyjna', 'vip'];
+export const PACKAGE_ORDER: PatientPackage[] = ['1', '2', '3', '6tyg', '8tyg', '6tyg_roz', '8tyg_roz', 'interwencyjna', 'vip', 'przyjazd_5tyg', 'powrot_przerwa'];
+
+// Pakiety bez kwoty bazowej (rozliczane są tylko usługi dodatkowe), domyślnie poza statystykami.
+// Przyjazd na 5. tydzień i powrót z przerwy warunkowej działają jak Grupa VIP (prośba Krystiana 06.10.2026).
+export const PACKAGES_WITHOUT_BASE: PatientPackage[] = ['vip', 'przyjazd_5tyg', 'powrot_przerwa'];
+// Dla tych dwóch pakietów maile powitalne i pożegnalne oraz listy GetResponse są na razie WYŁĄCZONE:
+// usługa wysyłki nie zna ich nazw (wysłałaby „Pakiet przyjazd_5tyg” i dopisała do listy Pakietu 1).
+// Włączyć po decyzji, czy i jakie maile mają dostawać.
+export const PACKAGES_WITHOUT_MAILS: PatientPackage[] = ['przyjazd_5tyg', 'powrot_przerwa'];
+export const isPackageWithoutMails = (pkg: string): boolean => PACKAGES_WITHOUT_MAILS.includes(pkg as PatientPackage);
+export const isPackageWithoutBase = (pkg: string): boolean => PACKAGES_WITHOUT_BASE.includes(pkg as PatientPackage);
 
 export const PACKAGE_LABELS: Record<PatientPackage, string> = {
   '1': 'Pakiet 1',
@@ -165,12 +176,15 @@ export const PACKAGE_LABELS: Record<PatientPackage, string> = {
   '8tyg_roz': '8 tygodni rozszerzony',
   'interwencyjna': 'Terapia interwencyjna',
   'vip': 'Grupa VIP',
+  'przyjazd_5tyg': 'Przyjazd 5. tydzień',
+  'powrot_przerwa': 'Powrót z przerwy warunkowej',
 };
 
 // Krótkie etykiety do wąskich miejsc (przyciski filtrów).
 export const PACKAGE_SHORT_LABELS: Record<PatientPackage, string> = {
   '1': '1', '2': '2', '3': '3', '6tyg': '6tyg', '8tyg': '8tyg',
   '6tyg_roz': '6t.R', '8tyg_roz': '8t.R', 'interwencyjna': 'Interw.', 'vip': 'VIP',
+  'przyjazd_5tyg': '5.tydz', 'powrot_przerwa': 'Powrót',
 };
 
 export const packageLabel = (pkg: string): string => PACKAGE_LABELS[pkg as PatientPackage] || pkg;

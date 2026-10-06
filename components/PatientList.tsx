@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Patient, Payment, formatCurrency, getAmountDue, getAdditionalServicesTotal, normalizeVoivodeship, DISCHARGE_TYPE_LABELS, isInterruptedTherapy } from '../types';
+import type { PatientPackage } from '../types';
 import { FileText, User, ScrollText, MessageCircle, CheckSquare, Square, Pencil, Trash2, Search, Wallet, X, CheckCircle, MapPin, Calendar, CreditCard, LogOut, Download, AlertTriangle, Clock, ArrowRight, Eye } from 'lucide-react';
 import { generateContract, generatePatientCard, generateRegulations, generateFilteredListPDF } from '../services/pdfGenerator';
 import PatientForm from './PatientForm';
@@ -31,7 +32,7 @@ interface PatientListProps {
 }
 
 const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, onSaveNotes, onDeletePatient, onDischargePatient, onReactivatePatient, onUpdateDischarge, onLoadFullPatient, onAddPayment }) => {
-  const [filterPackage, setFilterPackage] = useState<'all' | '1' | '2' | '3' | '6tyg' | '8tyg' | '6tyg_roz' | '8tyg_roz' | 'interwencyjna' | 'vip'>('all');
+  const [filterPackage, setFilterPackage] = useState<'all' | PatientPackage>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'discharged' | 'interrupted'>('active');
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [notesPatient, setNotesPatient] = useState<Patient | null>(null);
@@ -139,7 +140,8 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
     const searchLower = searchQuery.toLowerCase();
     const matchesSearch = p.firstName.toLowerCase().includes(searchLower) ||
                           p.lastName.toLowerCase().includes(searchLower) ||
-                          p.pesel.includes(searchLower);
+                          p.pesel.includes(searchLower) ||
+                          (p.contractNumber || '').toLowerCase().includes(searchLower);
     const matchesVoivodeship = filterVoivodeship === 'all' || normalizeVoivodeship(p.voivodeship) === filterVoivodeship;
     const matchesDateRange = isWithinDateRange(p.applicationDate, filterDateRange);
     const amountDue = getAmountDue(p);
@@ -224,7 +226,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
     try {
       const filterParts: string[] = [];
       if (filterPackage !== 'all') {
-        const pkgNameMap: Record<string, string> = { '1': 'Pakiet 1', '2': 'Pakiet 2', '3': 'Pakiet 3', '6tyg': '6 tygodni', '8tyg': '8 tygodni', '6tyg_roz': '6 tyg. rozszerzony', '8tyg_roz': '8 tyg. rozszerzony', 'interwencyjna': 'Terapia interwencyjna', 'vip': 'Grupa VIP' };
+        const pkgNameMap: Record<string, string> = { '1': 'Pakiet 1', '2': 'Pakiet 2', '3': 'Pakiet 3', '6tyg': '6 tygodni', '8tyg': '8 tygodni', '6tyg_roz': '6 tyg. rozszerzony', '8tyg_roz': '8 tyg. rozszerzony', 'interwencyjna': 'Terapia interwencyjna', 'vip': 'Grupa VIP', 'przyjazd_5tyg': 'Przyjazd 5. tydzień', 'powrot_przerwa': 'Powrót z przerwy warunkowej' };
         const pkgLabel = pkgNameMap[filterPackage] || filterPackage;
         filterParts.push(pkgLabel);
       }
@@ -785,6 +787,8 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                 { value: '8tyg_roz', label: '8t.R' },
                 { value: 'interwencyjna', label: 'Interw.' },
                 { value: 'vip', label: 'VIP' },
+                { value: 'przyjazd_5tyg', label: '5.tydz' },
+                { value: 'powrot_przerwa', label: 'Powrót' },
               ] as const).map((pkg) => (
                 <button
                   key={pkg.value}
@@ -1024,6 +1028,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                          </div>
                     </div>
                     <div className="text-xs text-gray-500 mb-1">PESEL: {patient.pesel}</div>
+                    {patient.contractNumber && <div className="text-xs text-gray-500 mb-1">Umowa: {patient.contractNumber}</div>}
                     <div className="text-xs text-gray-700 mt-2 bg-gray-100 p-1.5 rounded inline-block">
                       {patient.voivodeship}<br/>
                       {kartaDoWgladu(patient)
@@ -1061,9 +1066,11 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                       patient.package === '8tyg_roz' ? 'bg-fuchsia-100 text-fuchsia-800' :
                       patient.package === 'interwencyjna' ? 'bg-amber-100 text-amber-800' :
                       patient.package === 'vip' ? 'bg-rose-100 text-rose-800' :
+                      patient.package === 'przyjazd_5tyg' ? 'bg-sky-100 text-sky-800' :
+                      patient.package === 'powrot_przerwa' ? 'bg-orange-100 text-orange-800' :
                       'bg-teal-100 text-teal-800'
                     }`}>
-                      {{ '1': 'Pakiet 1', '2': 'Pakiet 2', '3': 'Pakiet 3', '6tyg': '6 tygodni', '8tyg': '8 tygodni', '6tyg_roz': '6 tyg. rozszerzony', '8tyg_roz': '8 tyg. rozszerzony', 'interwencyjna': 'Terapia interwencyjna', 'vip': 'Grupa VIP' }[patient.package] || patient.package}
+                      {{ '1': 'Pakiet 1', '2': 'Pakiet 2', '3': 'Pakiet 3', '6tyg': '6 tygodni', '8tyg': '8 tygodni', '6tyg_roz': '6 tyg. rozszerzony', '8tyg_roz': '8 tyg. rozszerzony', 'interwencyjna': 'Terapia interwencyjna', 'vip': 'Grupa VIP', 'przyjazd_5tyg': 'Przyjazd 5. tydzień', 'powrot_przerwa': 'Powrót z przerwy warunkowej' }[patient.package] || patient.package}
                     </span>
                     <div className="text-xs text-gray-600">
                       <span className="font-semibold">Start:</span> {patient.treatmentStartDate}

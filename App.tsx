@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
-import { Patient, QueuePatient, Payment, getAmountDue, formatCurrency } from './types';
+import { Patient, QueuePatient, Payment, getAmountDue, formatCurrency, isPackageWithoutMails } from './types';
 import PatientForm from './components/PatientForm';
 import PatientList from './components/PatientList';
 import QueueForm from './components/QueueForm';
@@ -90,7 +90,7 @@ const App: React.FC = () => {
 
       // Jak w obecnym CRM: listy GetResponse oraz, dla pakietu 3, konto w MyWayPoint (20 sesji).
       // (Wywołanie notifyNewPatient pominięte: ten adres nie istnieje, obecny CRM ignorował jego błąd.)
-      if (integracjeWlaczone()) {
+      if (integracjeWlaczone() && !isPackageWithoutMails(patientData.package)) {
         const emailSent = await sendWelcomeEmail({
           email: patientData.email,
           firstName: patientData.firstName,
@@ -201,6 +201,8 @@ const App: React.FC = () => {
       // 2. Mail powitalny + listy (jeśli jest e-mail). W ośrodku testowym wyłączone.
       if (!integracjeWlaczone()) {
         alert(`✅ ${patient.firstName} potwierdzony. Mail powitalny nie został wysłany (ośrodek testowy: maile wyłączone).`);
+      } else if (isPackageWithoutMails(patient.package)) {
+        alert(`✅ ${patient.firstName} potwierdzony. Dla tego rodzaju przyjazdu mail powitalny nie jest wysyłany.`);
       } else if (patient.email) {
         const result = await confirmPatientEmail({
           email: patient.email,
@@ -239,7 +241,7 @@ const App: React.FC = () => {
       const pokoj = r.zwolnionePrzydzialy > 0 ? ' Pokój zwolniony.' : '';
 
       // Mail pożegnalny TYLKO przy zakończeniu terapii (jak w obecnym CRM). E-mail jest w pełnej karcie.
-      if (dischargeData.dischargeType === 'completed' && integracjeWlaczone()) {
+      if (dischargeData.dischargeType === 'completed' && integracjeWlaczone() && !isPackageWithoutMails(patient.package)) {
         let email = '';
         try { email = (await pobierzPelnego(patient.id)).email; } catch { /* brak karty = brak maila */ }
         if (email) {

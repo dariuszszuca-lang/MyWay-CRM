@@ -40,6 +40,7 @@ export function pacjentZApi(r: any, pelny = false): Patient {
     hasWhatsapp: Boolean(r.whatsapp),
     onlineConsultations: r.konsultacjeOnline ?? 0,
     notes: r.notatki || '',
+    contractNumber: r.nrUmowy || '',
     status: r.status === 'wypisany' ? 'discharged' : 'active',
     dischargeType: r.typWypisu ? TYP_WYPISU_Z_API[r.typWypisu] : undefined,
     dischargeDate: r.dataWypisu || undefined,
@@ -96,6 +97,7 @@ export function pacjentDoApi(p: Patient): Record<string, unknown> {
     tydzien5: Boolean(p.isWeek5),
     konsultacjeOnline: Number(p.onlineConsultations) || 0,
     notatki: p.notes || '',
+    nrUmowy: p.contractNumber || '',
   };
 }
 

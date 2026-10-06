@@ -3,7 +3,7 @@
 // której używa kafelek „Przychód" w statystykach (naprawa asymetrii z Etapu 0).
 // Plik nie importuje nic w czasie wykonania, żeby test `node --test` czytał go bez bundlera.
 
-export const DEFAULT_EXCLUDED_PACKAGES: string[] = ['vip'];
+export const DEFAULT_EXCLUDED_PACKAGES: string[] = ['vip', 'przyjazd_5tyg', 'powrot_przerwa'];
 
 export interface AveragePerPatientInput {
   package: string;
