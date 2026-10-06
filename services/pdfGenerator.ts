@@ -117,6 +117,8 @@ export const generateContract = async (patient: Patient, issuerKey: ContractIssu
     doc.setFont("Roboto", isBold ? "bold" : "normal");
     doc.setFontSize(fontSize);
     const splitText = doc.splitTextToSize(text, contentWidth);
+    // Tekst, który nie mieści się na stronie, przechodzi na następną (numery stron dopisywane na końcu).
+    if (cursorY + splitText.length * lineHeight > 275) { doc.addPage(); cursorY = 20; }
     doc.text(splitText, align === 'center' ? 105 : (align === 'right' ? 190 : marginLeft), cursorY, { align: align, maxWidth: contentWidth });
     cursorY += (splitText.length * lineHeight);
   };
@@ -186,9 +188,6 @@ export const generateContract = async (patient: Patient, issuerKey: ContractIssu
     writeLine(`Termin zapłaty pozostałej kwoty: ${patient.paymentDeadline || '....................'}. Forma płatności: gotówką / przelewem na konto Ośrodka.`);
   }
 
-  doc.setFontSize(10);
-  doc.text("1", 105, 285, { align: 'center' });
-
   // --- PAGE 2 ---
   doc.addPage();
   cursorY = 20;
@@ -206,7 +205,7 @@ export const generateContract = async (patient: Patient, issuerKey: ContractIssu
       text: [
         "1. Zlecający zobowiązany jest do:",
         "a) przekazania wszystkich znanych mu informacji o swoim stanie zdrowia personelowi Ośrodka w trakcie wstępnego wywiadu przyjęcia na terapię,",
-        "b) nie zatajania lub celowego ujawniania jakichkolwiek informacji o swoim stanie zdrowia,",
+        "b) niezatajania ani celowego pomijania informacji o stanie zdrowia,",
         "c) korzystania z obiektów Ośrodka wyłącznie w zakresie uzgodnionym z Ośrodkiem oraz zgodnie z Regulaminem ustalonym przez Ośrodek,",
         "d) zapoznania się z Regulaminem Ośrodka i do jego przestrzegania."
       ]
@@ -215,7 +214,7 @@ export const generateContract = async (patient: Patient, issuerKey: ContractIssu
       title: "§ 3.",
       text: [
         "1. Strony ustalają, że warunkiem bezwzględnym do przyjęcia Zlecającego na odbycie świadczenia terapeutycznego jest ujawnienie personelowi Ośrodka wszystkich informacji związanych ze stanem zdrowia Zlecającego.",
-        "2. Personel Ośrodka, po konsultacji z lekarzem psychiatrą ma prawo podjęcia decyzji o przerwie w świadczeniu terapeutycznym, jeżeli podczas wstępnego wywiadu przyjęcia lub informacji uzyskanych później dokonana diagnoza stwierdza, że stan zdrowia Zlecającego wymaga zastosowania środków, które powinny być zastosowane w kierunkowo wyspecjalizowanym zakładzie leczniczym lub ośrodku medycznym. W przypadku decyzji o przerwie w przeprowadzeniu zabiegu, okres trwania umowy zostanie przedłużony o czas trwania przerwy a świadczenie terapeutyczne będzie udzielone po zakończeniu ww. przerwy na zasadach określonych w umowie.",
+        "2. Personel Ośrodka, po konsultacji z lekarzem psychiatrą ma prawo podjęcia decyzji o przerwie w świadczeniu terapeutycznym, jeżeli podczas wstępnego wywiadu przyjęcia lub informacji uzyskanych później dokonana diagnoza stwierdza, że stan zdrowia Zlecającego wymaga zastosowania środków, które powinny być zastosowane w kierunkowo wyspecjalizowanym zakładzie leczniczym lub ośrodku medycznym. W przypadku decyzji o przerwie w udzielaniu świadczeń terapeutycznych, okres trwania umowy zostanie przedłużony o czas trwania przerwy a świadczenie terapeutyczne będzie udzielone po zakończeniu ww. przerwy na zasadach określonych w umowie.",
         "3. Ujawnienie w trakcie pobierania świadczenia terapeutycznego celowo zatajonych przez Zlecającego informacji o stanie zdrowia Zlecającego może stanowić, według uznania Ośrodka, podstawę do natychmiastowego rozwiązania umowy w zakresie obowiązków Ośrodka, a wpłacone wynagrodzenie nie podlega zwrotowi.",
         "4. Rażące naruszenie Regulaminu Ośrodka (w szczególności spożywanie alkoholu, zażywanie narkotyków i innych środków psychoaktywnych oraz leków niewydanych z przepisu lekarza) przez Zlecającego w trakcie pobierania świadczenia terapeutycznego może stanowić, według uznania Ośrodka, podstawę do natychmiastowego rozwiązania umowy w zakresie obowiązków Ośrodka, bez prawa zwrotu wynagrodzenia Zlecającemu."
       ]
@@ -225,7 +224,7 @@ export const generateContract = async (patient: Patient, issuerKey: ContractIssu
       text: [
         "1. Ośrodek jest odpowiedzialny za wykonanie niniejszej umowy na zasadach w niej określonych. 2. Ośrodek nie ponosi odpowiedzialności z tytułu niewykonania lub nienależytego wykonania umowy, jeżeli będzie to wynikiem wyłącznej winy Zlecającego, w szczególności w przypadku samowolnego przerwania procesu terapeutycznego i opuszczenia Ośrodka przez Zlecającego, zatajenia przez Zlecającego informacji na temat jego stanu zdrowia lub rażącego nieprzestrzegania Regulaminu Ośrodka przez Zlecającego.",
         "3. Rezygnacja przez Zlecającego ze świadczenia terapeutycznego nie może stanowić podstawy do zwrotu wynagrodzenia z tytułu realizacji Umowy. W przypadku niemożliwości brania udziału w świadczeniu terapeutycznym przez Zlecającego z przyczyn medycznych, Zlecający ma prawo do odebrania w innym terminie niedostarczonych świadczeń wynikających z umowy po ustaniu tej przeszkody.",
-        "4. Ośrodek zapewni Zlecającemu jednorazową konsultację psychiatryczną, koszt każdej następnej konsultacji psychiatrycznej ponosi Zlecający, według aktualnie obowiązującego cennika.",
+        "4. W ramach ceny pakietu Zlecającemu przysługuje liczba konsultacji psychiatrycznych określona dla wybranego pakietu: jedna konsultacja dla Pakietów 1, 2, 3 i 6 oraz ich wariantów rozszerzonych, a dwie konsultacje dla Pakietu 8 i jego wariantu rozszerzonego. Każda kolejna konsultacja psychiatryczna jest usługą dodatkowo płatną według aktualnego cennika Ośrodka.",
         "5. Zlecający jest odpowiedzialny względem Ośrodka za wszelkie szkody powstałe swoim zawinionym działaniem w toku realizacji Umowy."
       ]
     }
@@ -239,34 +238,32 @@ export const generateContract = async (patient: Patient, issuerKey: ContractIssu
     });
   });
 
-  doc.text("2", 105, 285, { align: 'center' });
-
-  // --- PAGE 3 ---
-  doc.addPage();
-  cursorY = 20;
+  // --- PAGE 3 --- (bez wymuszonej nowej strony: tekst płynie dalej)
+  addSpace(1);
 
   const page3Content = [
     {
       title: "§ 5",
       text: [
-        "1. W ramach wykonania umowy Pakiet 1 lub Pakiet 2, Zlecającemu przysługuje prawo do:",
+        "1. W ramach wykonania umowy Pakiet 1, Pakiet 2, Pakiet 6 tygodni lub Pakiet 8 tygodni, Zlecającemu przysługuje prawo do:",
         "a) korzystania ze świadczenia terapeutycznego,",
-        "b) odbycia jednorazowej konsultacji psychiatrycznej,",
+        "b) odbycia konsultacji psychiatrycznych w liczbie określonej w § 4 ust. 4,",
         "c) otrzymania materiałów Terapeutycznych w trakcie pobytu w ośrodku",
-        "2. W ramach wykonania umowy Pakiet 3, Zlecającemu przysługuje prawo do:",
+        "2. W ramach wykonania umowy Pakiet 3, Pakiet 6 tygodni rozszerzony lub Pakiet 8 tygodni rozszerzony, Zlecającemu przysługuje prawo do:",
         "a) korzystania ze świadczenia terapeutycznego,",
-        "b) odbycia jednorazowej konsultacji psychiatrycznej,",
+        "b) odbycia konsultacji psychiatrycznych w liczbie określonej w § 4 ust. 4,",
         "c) otrzymania materiałów Terapeutycznych w trakcie pobytu w ośrodku",
         "d) odbycia 20 indywidualnych konsultacji z terapeutą leczenia uzależnień w formie video lub tele-konsultacji,",
-        "3. Prawo do świadczeń, o których mowa w ustępie 2 niniejszego paragrafu przysługuje Zlecającemu przez okres 6 miesięcy, licząc od dnia ukończenia terapii."
+        "3. Prawo do świadczeń, o których mowa w ustępie 2 lit. d niniejszego paragrafu przysługuje Zlecającemu przez okres 6 miesięcy, licząc od dnia ukończenia terapii.",
+        "4. Zakres Umowy może zostać rozszerzony o dodatkowe świadczenia lub przedłużenie pobytu na podstawie pisemnego aneksu albo zamówienia usługi dodatkowej, wskazującego rodzaj świadczenia, cenę, termin realizacji i termin płatności. Wpłaty dotyczące świadczeń dodatkowych są potwierdzane dokumentem powiązanym z numerem niniejszej Umowy."
       ]
     },
     {
       title: "§ 6",
       text: [
         "1. Ośrodek oświadcza, że będzie przetwarzał dane osobowe Zlecającego w sposób zgodny z postanowieniami powszechnie obowiązujących przepisów prawa, w szczególności rozporządzeniem Parlamentu Europejskiego i Rady/EU/2016/679 z dnia 27 kwietnia 2016 r. w sprawie ochrony osób fizycznych w związku z przetwarzaniem danych osobowych i w sprawie swobodnego przepływu takich danych oraz uchylenia dyrektywy 95/46/WE (Dz. urz. UE L2016, Nr 119, s.1) (zwanym dalej RODO).",
-        "2. Zlecający oświadcza, że zapoznał się z klauzulą informacyjną dotyczącą przetwarzania danych osobowych przez Ośrodek, otrzymał ją i wyraża zgodę na jej treść.",
-        "3. Zlecający wyraża zgodę na przetwarzanie swoich danych osobowych, w tym adresu e-mail, przez Ośrodek w celu wysyłania wiadomości edukacyjnych, informacyjnych oraz sprzedażowych związanych z działalnością Ośrodka. Zlecający ma prawo do wycofania tej zgody w dowolnym momencie, co nie wpływa na zgodność z prawem przetwarzania, które miało miejsce przed jej wycofaniem. W celu wycofania zgody Zlecający może skontaktować się z Ośrodkiem za pośrednictwem wskazanych kanałów komunikacji."
+        "2. Zlecający oświadcza, że zapoznał się z klauzulą informacyjną dotyczącą przetwarzania danych osobowych przez Ośrodek i ją otrzymał.",
+        "3. Zgoda marketingowa (dobrowolna, niezależna od zawarcia Umowy):   [   ] wyrażam zgodę   [   ] nie wyrażam zgody   na przetwarzanie moich danych osobowych, w tym adresu e-mail, przez Ośrodek w celu wysyłania wiadomości edukacyjnych, informacyjnych oraz sprzedażowych związanych z działalnością Ośrodka. Zlecający ma prawo do wycofania tej zgody w dowolnym momencie, co nie wpływa na zgodność z prawem przetwarzania, które miało miejsce przed jej wycofaniem. W celu wycofania zgody Zlecający może skontaktować się z Ośrodkiem za pośrednictwem wskazanych kanałów komunikacji."
       ]
     },
     {
@@ -295,11 +292,8 @@ export const generateContract = async (patient: Patient, issuerKey: ContractIssu
   
   writeLine(`prowadzonego przez ${issuer.fullName} Spółkę z ograniczoną odpowiedzialnością z siedzibą w Kąpinie przy ulicy Wichrowe Wzgórza 21, ${issuer.registry}.`);
 
-  doc.text("3", 105, 285, { align: 'center' });
-
-  // --- PAGE 4 ---
-  doc.addPage();
-  cursorY = 20;
+  // --- PAGE 4 --- (bez wymuszonej nowej strony: tekst płynie dalej)
+  addSpace(1);
 
   const page4Content = [
     "1. Na podstawie art. 13 Rozporządzenia Parlamentu Europejskiego i Rady (UE) 2016/679 z dnia 27 kwietnia 2016 r. w sprawie ochrony osób fizycznych w związku z przetwarzaniem danych osobowych i w sprawie swobodnego przepływu takich danych oraz uchylenia dyrektywy 95/46/WE (RODO), informujemy o przetwarzaniu danych oraz prawach związanych z przetwarzaniem tych danych.",
@@ -318,12 +312,14 @@ export const generateContract = async (patient: Patient, issuerKey: ContractIssu
   });
 
   addSpace(4);
+  if (cursorY > 250) { doc.addPage(); cursorY = 30; }
   doc.text("OŚRODEK", marginLeft + 20, cursorY);
   doc.text("ZLECAJĄCY", 130, cursorY);
   
   doc.text(".............................................", marginLeft, cursorY + 20);
   doc.text(".............................................", 120, cursorY + 20);
   
+  addPageNumbers(doc);
   doc.save(`Umowa_${patient.lastName}_${patient.firstName}.pdf`);
 };
 
