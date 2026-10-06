@@ -123,9 +123,13 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
     }
   }, [initialData]);
 
-  // Pre-fill from queue patient data
+  // Pre-fill from queue patient data.
+  // Tylko RAZ na wpis z kolejki: lista pacjentów odświeża się co 20 s i bez tej blokady
+  // każde odświeżenie nadpisywało to, co ktoś właśnie wpisał (PESEL, adres, e-mail).
+  const wypelnionoZKolejki = useRef<string | null>(null);
   useEffect(() => {
-    if (prefillFromQueue) {
+    if (prefillFromQueue && wypelnionoZKolejki.current !== prefillFromQueue.id) {
+      wypelnionoZKolejki.current = prefillFromQueue.id;
       // Jeśli kolejka ma linkedPatientId — weź pełne dane z karty pacjenta (wracający)
       const linked = prefillFromQueue.linkedPatientId
         ? (allPatients || []).find(p => p.id === prefillFromQueue.linkedPatientId)
