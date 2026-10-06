@@ -41,6 +41,7 @@ export function pacjentZApi(r: any, pelny = false): Patient {
     onlineConsultations: r.konsultacjeOnline ?? 0,
     notes: r.notatki || '',
     contractNumber: r.nrUmowy || '',
+    issuer: r.spolka || undefined,
     status: r.status === 'wypisany' ? 'discharged' : 'active',
     dischargeType: r.typWypisu ? TYP_WYPISU_Z_API[r.typWypisu] : undefined,
     dischargeDate: r.dataWypisu || undefined,
@@ -98,6 +99,7 @@ export function pacjentDoApi(p: Patient): Record<string, unknown> {
     konsultacjeOnline: Number(p.onlineConsultations) || 0,
     notatki: p.notes || '',
     nrUmowy: p.contractNumber || '',
+    ...(p.issuer ? { spolka: p.issuer } : {}),
   };
 }
 

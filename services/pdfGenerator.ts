@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Patient, getAmountDue, formatCurrency, normalizeVoivodeship } from '../types';
+import { Patient, getAmountDue, getAdditionalServicesTotal, formatCurrency, normalizeVoivodeship, packageLabel } from '../types';
+import { CONTRACT_ISSUERS, ContractIssuerKey } from './issuer';
 import { loadFonts, addLogo } from './pdfBase';
 
 // Re-eksport dla komponentów, które importują loadFonts stąd (DischargesReport)
@@ -102,7 +103,8 @@ export const generatePatientCard = async (patient: Patient) => {
 };
 
 // 4-Page Contract Generation
-export const generateContract = async (patient: Patient) => {
+export const generateContract = async (patient: Patient, issuerKey: ContractIssuerKey = 'bella') => {
+  const issuer = CONTRACT_ISSUERS[issuerKey];
   const doc = new jsPDF();
   await loadFonts(doc);
 
@@ -124,13 +126,13 @@ export const generateContract = async (patient: Patient) => {
   // --- PAGE 1 ---
   
   // Title
-  writeLine("UMOWA O PODJĘCIE TERAPII", true, "center", 14);
+  writeLine(patient.contractNumber ? `UMOWA O PODJĘCIE TERAPII NR ${patient.contractNumber}` : "UMOWA O PODJĘCIE TERAPII", true, "center", 14);
   addSpace(2);
 
   writeLine(`zawarta w dniu ${patient.applicationDate}`, false, "left", 10);
   addSpace();
 
-  writeLine("pomiędzy firmą: Bella Vita 3City Sp. z o.o., NIP: 588-242-22-71, ul. Wichrowe Wzgórza 21, 84-200 Kąpino, zwaną dalej \"Ośrodkiem\"");
+  writeLine(`pomiędzy firmą: ${issuer.party}, zwaną dalej "Ośrodkiem"`);
   writeLine("a");
   addSpace();
 
@@ -150,11 +152,39 @@ export const generateContract = async (patient: Patient) => {
   writeLine(`Data zakończenia: ${patient.treatmentEndDate}`, true);
   addSpace();
 
-  const amountDue = getAmountDue(patient);
-  writeLine(`Całościowa kwota terapii: ${formatCurrency(patient.totalAmount)} za pakiet ${patient.package}`);
-  writeLine(`Wpłacono zadatek w kwocie: ${formatCurrency(patient.amountPaid)} gotówką / przelewem na konto Ośrodka.`);
-  writeLine(`Pozostałą kwotę w wysokości: ${formatCurrency(amountDue)} za terapię`);
-  writeLine(`gotówką/ przelewem na konto Ośrodka, wpłacona zostanie do dnia ${patient.paymentDeadline}`, true);
+  // Warunki finansowe: wpłaty prosto z historii rozliczeń (nie z jednego pola „zadatek").
+  const amountDue = Math.round(getAmountDue(patient) * 100) / 100;
+  const dzisiaj = new Date().toISOString().split('T')[0];
+  const wplaty = (patient.payments || []).filter((w) => !w.cancelled && w.amount);
+  const uslugi = getAdditionalServicesTotal(patient);
+  const FORMA: Record<string, string> = { przelew: 'przelew', gotowka: 'gotówka', karta: 'karta', przedplata: 'przedpłata' };
+  writeLine("Warunki finansowe i rozliczenie", true);
+  writeLine(`Cena podstawowa wybranego pakietu: ${formatCurrency(patient.totalAmount)}. Pakiet: ${packageLabel(patient.package)}.`);
+  if (uslugi > 0) writeLine(`Usługi dodatkowe i przedłużenia: ${formatCurrency(uslugi)}. Łączna należność: ${formatCurrency(patient.totalAmount + uslugi)}.`);
+  addSpace(0.5);
+  if (wplaty.length > 0) {
+    writeLine(`Wpłaty zarejestrowane do dnia ${dzisiaj}:`);
+    autoTable(doc, {
+      startY: cursorY,
+      margin: { left: marginLeft, right: 20 },
+      head: [['Lp.', 'Data wpłaty', 'Tytuł wpłaty', 'Forma płatności', 'Kwota']],
+      body: wplaty.map((w, i) => [String(i + 1), w.date || '—', w.purpose || (w.method === 'przedplata' ? 'Zadatek' : 'Płatność za terapię'), FORMA[w.method] || w.method, formatCurrency(w.amount)]),
+      styles: { font: 'Roboto', fontSize: 9, cellPadding: 1.5, textColor: 20 },
+      headStyles: { fillColor: [230, 230, 230], textColor: 20, fontStyle: 'bold' },
+      columnStyles: { 0: { cellWidth: 12 }, 4: { halign: 'right' } },
+      theme: 'grid',
+    });
+    cursorY = (doc as any).lastAutoTable.finalY + 6;
+  } else {
+    writeLine(`Do dnia ${dzisiaj} nie zarejestrowano wpłat.`);
+  }
+  writeLine(`Łącznie wpłacono: ${formatCurrency(patient.amountPaid)}`, true);
+  if (amountDue <= 0) {
+    writeLine(`Umowa została rozliczona w całości na dzień ${dzisiaj}.`, true);
+  } else {
+    writeLine(`Pozostało do zapłaty: ${formatCurrency(amountDue)}`, true);
+    writeLine(`Termin zapłaty pozostałej kwoty: ${patient.paymentDeadline || '....................'}. Forma płatności: gotówką / przelewem na konto Ośrodka.`);
+  }
 
   doc.setFontSize(10);
   doc.text("1", 105, 285, { align: 'center' });
@@ -263,7 +293,7 @@ export const generateContract = async (patient: Patient) => {
   writeLine("KLAUZULA INFORMACYJNA DLA OSÓB (PACJENTÓW) KORZYSTAJĄCYCH Z USŁUG OŚRODKA LECZENIA UZALEŻNIEŃ MY WAY", true, "center");
   addSpace();
   
-  writeLine("prowadzonego przez Bella Vita 3City Spółkę z ograniczoną odpowiedzialnością z siedzibą w Kąpinie przy ulicy Wichrowe Wzgórza 21, wpisaną do Krajowego Rejestru Sądowego – Rejestru Przedsiębiorców przez Sąd Rejonowy Gdańsk Północ w Gdańsku, VII Wydział Gospodarczy Krajowego Rejestru Sądowego pod numerem KRS: 0000644953.");
+  writeLine(`prowadzonego przez ${issuer.fullName} Spółkę z ograniczoną odpowiedzialnością z siedzibą w Kąpinie przy ulicy Wichrowe Wzgórza 21, ${issuer.registry}.`);
 
   doc.text("3", 105, 285, { align: 'center' });
 
@@ -273,7 +303,7 @@ export const generateContract = async (patient: Patient) => {
 
   const page4Content = [
     "1. Na podstawie art. 13 Rozporządzenia Parlamentu Europejskiego i Rady (UE) 2016/679 z dnia 27 kwietnia 2016 r. w sprawie ochrony osób fizycznych w związku z przetwarzaniem danych osobowych i w sprawie swobodnego przepływu takich danych oraz uchylenia dyrektywy 95/46/WE (RODO), informujemy o przetwarzaniu danych oraz prawach związanych z przetwarzaniem tych danych.",
-    "2. Administratorem Pani/Pana danych osobowych jest Bella Vita 3City Spółka z ograniczoną odpowiedzialnością z siedzibą w Kąpinie przy ulicy Wichrowe Wzgórza 21, wpisana do Krajowego Rejestru Sądowego – Rejestru Przedsiębiorców przez Sąd Rejonowy Gdańsk Północ w Gdańsku, VII Wydział Gospodarczy Krajowego Rejestru Sądowego pod numerem KRS: 0000644953. W każdej sprawie dotyczącej przetwarzania danych osobowych należy kontaktować się z administratorem poprzez e-mail: kontakt@osrodekleczeniauzaleznien.com.",
+    `2. Administratorem Pani/Pana danych osobowych jest ${issuer.fullName} Spółka z ograniczoną odpowiedzialnością z siedzibą w Kąpinie przy ulicy Wichrowe Wzgórza 21, ${issuer.registry.replace('wpisaną', 'wpisana')}. W każdej sprawie dotyczącej przetwarzania danych osobowych należy kontaktować się z administratorem poprzez e-mail: kontakt@osrodekleczeniauzaleznien.com.`,
     "3. Podstawa i cel przetwarzania danych. Dane osobowe są przetwarzane:",
     "a) na podstawie zgody, w celu udzielania świadczeń dla osób (pacjentów) korzystających z usług Ośrodka Leczenia Uzależnień My Way (zwanego też dalej Ośrodkiem), a także w celu zarządzania usługami opieki zdrowotnej, na podstawie art. 9 ust. 2 lit a. RODO",
     "b) za pośrednictwem systemu monitoringu wizyjnego (wizerunek) w celu ochrony mienia i zwiększenia bezpieczeństwa na terenie Ośrodka Leczenia Uzależnień, na podstawie art. 6 ust. 1 lit f. RODO – prawnie uzasadnionym interesem realizowanym przez administratora jest zapewnienie bezpieczeństwa mienia jak i bezpieczeństwa osób przebywających na terenie ośrodka. Podanie danych w celu określonym w lit a. jest obowiązkowe w celu podjęcia terapii (korzystania z usług) Ośrodka. Dane osobowe nie będą podlegać zautomatyzowanemu podejmowaniu decyzji lub profilowaniu.",

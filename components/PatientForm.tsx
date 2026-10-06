@@ -430,7 +430,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
             </div>
             <div>
               <label className={labelClass}>Nr umowy{isVip && formData.package !== 'vip' ? ' głównej' : ''}</label>
-              <input placeholder="np. 123/2026" name="contractNumber" maxLength={40} value={formData.contractNumber || ''} onChange={handleChange} className={inputClass} />
+              <input placeholder="nadawany przy wydruku umowy (MW/rok/nr)" name="contractNumber" maxLength={40} value={formData.contractNumber || ''} onChange={handleChange} className={inputClass} />
             </div>
           </div>
 

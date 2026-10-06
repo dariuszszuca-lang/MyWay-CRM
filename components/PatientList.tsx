@@ -6,6 +6,8 @@ import { generateContract, generatePatientCard, generateRegulations, generateFil
 import PatientForm from './PatientForm';
 import DischargeDocuments from './DischargeDocuments';
 import PatientNotesPanel from './PatientNotesPanel';
+import { przygotujUmowe } from '../services/aws/dane';
+import { CONTRACT_ISSUERS, ContractIssuerKey } from '../services/issuer';
 
 interface DischargeData {
   dischargeType: 'completed' | 'resignation' | 'referral' | 'conditional_break' | 'expelled';
@@ -43,6 +45,25 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
   const [ladujeKarte, setLadujeKarte] = useState<string | null>(null);
 
   // Zawsze świeża karta z serwera (do edycji i dokumentów). Każde pobranie trafia do dziennika dostępu.
+  // Wydruk umowy: najpierw wybór spółki (zapamiętywany w karcie), potem nadanie numeru i PDF.
+  const [umowaDla, setUmowaDla] = useState<Patient | null>(null);
+  const [umowaSpolka, setUmowaSpolka] = useState<ContractIssuerKey | ''>('');
+  const [umowaCzekam, setUmowaCzekam] = useState(false);
+  const drukujUmowe = async () => {
+    if (!umowaDla || !umowaSpolka || umowaCzekam) return;
+    setUmowaCzekam(true);
+    try {
+      const karta = await przygotujUmowe(umowaDla.id, umowaSpolka);
+      setPelneKarty(prev => ({ ...prev, [karta.id]: karta }));
+      await generateContract(karta, umowaSpolka);
+      setUmowaDla(null);
+    } catch (err) {
+      alert(`Nie udało się przygotować umowy. ${(err as Error).message}`);
+    } finally {
+      setUmowaCzekam(false);
+    }
+  };
+
   const pobierzKarte = async (patient: Patient): Promise<Patient | null> => {
     setLadujeKarte(patient.id);
     try {
@@ -348,6 +369,35 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
 
   return (
     <div className="space-y-4 relative">
+      {umowaDla && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="umowa-tytul">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <h3 id="umowa-tytul" className="text-lg font-bold text-gray-800">Umowa: {umowaDla.firstName} {umowaDla.lastName}</h3>
+            <p className="text-sm text-gray-600 mt-1">
+              {umowaDla.contractNumber ? `Numer umowy: ${umowaDla.contractNumber}` : 'Numer umowy zostanie nadany automatycznie przy wydruku.'}
+            </p>
+            <fieldset className="mt-4 space-y-2">
+              <legend className="text-sm font-medium text-gray-700 mb-2">Która spółka zawiera umowę?</legend>
+              {(Object.keys(CONTRACT_ISSUERS) as ContractIssuerKey[]).map((k) => (
+                <label key={k} className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer ${umowaSpolka === k ? 'border-teal-600 bg-teal-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                  <input type="radio" name="spolka-umowy" value={k} checked={umowaSpolka === k} onChange={() => setUmowaSpolka(k)} className="w-4 h-4 accent-teal-600" />
+                  <span className="text-sm text-gray-800">{CONTRACT_ISSUERS[k].label}</span>
+                </label>
+              ))}
+            </fieldset>
+            {umowaDla.issuer && umowaSpolka && umowaSpolka !== umowaDla.issuer && (
+              <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">Ta karta miała dotąd zapisaną inną spółkę. Po wydruku zapisze się nowy wybór.</p>
+            )}
+            <div className="mt-6 flex gap-3 justify-end">
+              <button type="button" onClick={() => setUmowaDla(null)} disabled={umowaCzekam} className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">Anuluj</button>
+              <button type="button" onClick={drukujUmowe} disabled={!umowaSpolka || umowaCzekam} className="px-4 py-2 text-sm font-semibold text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:bg-gray-300">
+                {umowaCzekam ? 'Przygotowuję…' : 'Drukuj umowę'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal for Editing */}
       {editingPatient && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
@@ -1154,7 +1204,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                   {/* Dokumenty */}
                   <td className="p-3 align-top text-right space-y-2">
                     <button
-                      onClick={async () => { const k = await pobierzKarte(patient); if (k) generateContract(k); }}
+                      onClick={async () => { const k = await pobierzKarte(patient); if (k) { setUmowaDla(k); setUmowaSpolka(k.issuer || ''); } }}
                       className="w-full justify-center inline-flex items-center gap-1 px-3 py-1.5 border border-teal-600 text-teal-600 rounded hover:bg-teal-50 text-xs font-medium transition-colors"
                     >
                       <FileText className="w-3 h-3" />

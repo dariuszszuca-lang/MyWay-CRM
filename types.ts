@@ -33,6 +33,7 @@ export interface Patient {
   hasWhatsapp: boolean;
   onlineConsultations: number;
   notes: string;
+  issuer?: 'bella' | 'myway'; // spółka wystawiająca umowę (wybierana przed wydrukiem)
   contractNumber?: string; // nr umowy: łączy przyjazd na 5. tydzień / powrót z przerwy z umową główną
 
   // Patient status

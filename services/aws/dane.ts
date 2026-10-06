@@ -231,3 +231,14 @@ export async function usunZKolejki(id: string, powod: string): Promise<void> {
   await api('DELETE', `/kolejka/${id}`, { powod });
   zmieniono('kolejka', 'pokoje');
 }
+
+// Przed wydrukiem umowy: zapisuje wybraną spółkę i nadaje numer umowy (MW/ROK/NR), jeśli karta go nie ma.
+// Zwraca świeżą pełną kartę, z której drukuje się dokument.
+export async function przygotujUmowe(id: string, spolka: 'bella' | 'myway'): Promise<Patient> {
+  const p = await pobierzPelnego(id);
+  if (p.issuer !== spolka) await api('PUT', `/pacjenci/${id}`, { spolka, wersja: p.wersja });
+  if (!p.contractNumber) await api('POST', `/pacjenci/${id}/numer-umowy`);
+  const swieza = await pobierzPelnego(id);
+  zmieniono('pacjenci');
+  return swieza;
+}
