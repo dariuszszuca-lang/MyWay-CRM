@@ -5,6 +5,10 @@ import { pobierzRaportRozliczen, RaportRozliczen } from '../services/aws/dane';
 // Raport rozliczeń za dowolny okres (specyfikacja zmian CRM, punkt 8). Liczy serwer, tylko dla grupy ze statystykami.
 const FORMY: Record<string, string> = { przelew: 'Przelew', gotowka: 'Gotówka', karta: 'Karta', przedplata: 'Przedpłata', brak: 'Nie podano' };
 const pole = 'px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-black focus:outline-none focus:ring-2 focus:ring-teal-600';
+const POWODY: Record<string, string> = {
+  'brak-pacjenta': 'nie ma pacjenta z takim numerem PESEL w CRM', niejednoznaczne: 'kilka kart z tym numerem PESEL, nie wiadomo która', 'brak-pakietu': 'karta bez pakietu',
+  'zly-pesel': 'błędny numer PESEL w arkuszu', 'brak-daty': 'brak daty zgłoszenia i daty wizyty', 'blad-polaczenia': 'błąd połączenia z arkuszem',
+};
 const pierwszyDzien = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; };
 
 const SettlementsReport: React.FC = () => {
@@ -73,6 +77,26 @@ const SettlementsReport: React.FC = () => {
               Poza okresem: {r.wplatyBezDaty.liczba} starych wpłat bez daty na łączną kwotę {formatCurrency(r.wplatyBezDaty.suma)} (zapisane kiedyś jako sama kwota „wpłacono”). Nie da się ich przypisać do żadnego okresu.
             </p>
           )}
+
+          <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+            <h4 className="text-sm font-bold text-gray-700 mb-2">Zapisy do psychiatry z formularza (arkusz)</h4>
+            {!r.arkusz ? <p className="text-sm text-gray-500">Synchronizacja z arkuszem nie jest jeszcze włączona.</p> : (
+              <>
+                <p className="text-sm text-gray-700">
+                  Ostatnie sprawdzenie: {r.arkusz.koniec ? new Date(r.arkusz.koniec).toLocaleString('pl-PL') : 'brak'}. Wierszy w arkuszu: {r.arkusz.wierszy}, w CRM: {r.arkusz.zsynchronizowano} (nowe: {r.arkusz.noweWizyty}, zaktualizowane: {r.arkusz.zaktualizowane}).
+                </p>
+                {r.arkusz.blad && <p className="text-sm text-red-700 mt-1">Ostatnie sprawdzenie zakończyło się błędem połączenia z arkuszem.</p>}
+                {r.arkusz.doWyjasnienia.length > 0 && (
+                  <table className="w-full text-sm mt-3">
+                    <thead><tr className="text-left text-xs text-gray-500 border-b"><th className="py-1 pr-3">Wiersz arkusza</th><th className="py-1 pr-3">Osoba w arkuszu</th><th className="py-1">Do wyjaśnienia</th></tr></thead>
+                    <tbody>{r.arkusz.doWyjasnienia.map((u, i) => (
+                      <tr key={i} className="border-b border-gray-100"><td className="py-1 pr-3">{u.wiersz}</td><td className="py-1 pr-3">{u.osoba}</td><td className="py-1">{POWODY[u.powod] || u.powod}</td></tr>
+                    ))}</tbody>
+                  </table>
+                )}
+              </>
+            )}
+          </div>
 
           <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
             <h4 className="text-sm font-bold text-gray-700 mb-2">Pacjenci z nieopłaconymi usługami ({r.nieoplaconeUslugi.length})</h4>

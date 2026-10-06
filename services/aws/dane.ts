@@ -286,5 +286,7 @@ export interface RaportRozliczen {
   psychiatra: { wPakiecie: number; platne: number; wartoscPlatnych: number };
   nieoplaconeUslugi: { pacjent: string; typ: string; data: string; kwota: number; status: string; termin: string }[];
   niewykorzystaneKonsultacje: { pacjent: string; pakiet: string; limit: number; wykorzystane: number; terapiaDo: string }[];
+  // Ostatnia synchronizacja arkusza zapisów do psychiatry (null = jeszcze nie działa).
+  arkusz: null | { koniec?: string; wierszy: number; zsynchronizowano: number; noweWizyty: number; zaktualizowane: number; pominiete: Record<string, number>; bledy: Record<string, number>; doWyjasnienia: { wiersz: number; osoba: string; powod: string }[]; blad?: string };
 }
 export const pobierzRaportRozliczen = (od: string, doDnia: string): Promise<RaportRozliczen> => api('GET', `/raporty/rozliczenia?od=${od}&do=${doDnia}`);
