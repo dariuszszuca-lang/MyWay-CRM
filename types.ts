@@ -34,6 +34,10 @@ export interface Patient {
   onlineConsultations: number;
   notes: string;
   issuer?: 'bella' | 'myway'; // spółka wystawiająca umowę (wybierana przed wydrukiem)
+  // AWS: liczniki wizyt u psychiatry (z listy): zajęte miejsca w pakiecie, zrealizowane w pakiecie, płatne
+  psychInPackage?: number;
+  psychDone?: number;
+  psychPaid?: number;
   contractNumber?: string; // nr umowy: łączy przyjazd na 5. tydzień / powrót z przerwy z umową główną
 
   // Patient status

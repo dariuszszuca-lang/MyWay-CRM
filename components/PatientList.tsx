@@ -1,11 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import { Patient, Payment, formatCurrency, getAmountDue, getAdditionalServicesTotal, normalizeVoivodeship, DISCHARGE_TYPE_LABELS, isInterruptedTherapy } from '../types';
 import type { PatientPackage } from '../types';
+
+// Konsultacje psychiatryczne w cenie pakietu (to samo co na serwerze: psychiatra-logika.mjs).
+const PSYCH_LIMIT: Record<string, number> = { '1': 1, '2': 1, '3': 1, '6tyg': 1, '6tyg_roz': 1, '8tyg': 2, '8tyg_roz': 2 };
 import { FileText, User, ScrollText, MessageCircle, CheckSquare, Square, Pencil, Trash2, Search, Wallet, X, CheckCircle, MapPin, Calendar, CreditCard, LogOut, Download, AlertTriangle, Clock, ArrowRight, Eye } from 'lucide-react';
 import { generateContract, generatePatientCard, generateRegulations, generateFilteredListPDF } from '../services/pdfGenerator';
 import PatientForm from './PatientForm';
 import DischargeDocuments from './DischargeDocuments';
 import PatientNotesPanel from './PatientNotesPanel';
+import PsychiatristPanel from './PsychiatristPanel';
 import { przygotujUmowe } from '../services/aws/dane';
 import { CONTRACT_ISSUERS, ContractIssuerKey } from '../services/issuer';
 
@@ -46,6 +50,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
 
   // Zawsze świeża karta z serwera (do edycji i dokumentów). Każde pobranie trafia do dziennika dostępu.
   // Wydruk umowy: najpierw wybór spółki (zapamiętywany w karcie), potem nadanie numeru i PDF.
+  const [psychPatient, setPsychPatient] = useState<Patient | null>(null);
   const [umowaDla, setUmowaDla] = useState<Patient | null>(null);
   const [umowaSpolka, setUmowaSpolka] = useState<ContractIssuerKey | ''>('');
   const [umowaCzekam, setUmowaCzekam] = useState(false);
@@ -1175,19 +1180,12 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
                       <span className={`text-sm ${patient.hasWhatsapp ? 'font-bold text-gray-900' : 'text-gray-600'}`}>WhatsApp</span>
                     </label>
 
-                    {/* Konsultacje Input */}
+                    {/* Psychiatra: limit z pakietu i wizyty (zamiast ręcznego pola „Konsultacje online”) */}
                     <div>
-                      <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Konsultacje Online</label>
-                      <div className="flex items-center gap-2">
-                        <input 
-                          type="number" 
-                          min="0"
-                          value={patient.onlineConsultations}
-                          onChange={(e) => onUpdatePatient({ ...patient, onlineConsultations: parseInt(e.target.value) || 0 })}
-                          className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-white text-black [&::-webkit-inner-spin-button]:appearance-auto [&::-webkit-inner-spin-button]:opacity-100"
-                        />
-                        <span className="text-xs text-gray-500">szt.</span>
-                      </div>
+                      <span className="block text-xs font-semibold text-gray-500 uppercase mb-1">Psychiatra</span>
+                      <button type="button" onClick={() => setPsychPatient(patient)} className="inline-flex items-center gap-1.5 text-sm font-medium text-teal-700 hover:text-teal-900 hover:underline" aria-label={`Psychiatra: ${patient.firstName} ${patient.lastName}`}>
+                        {(patient.psychInPackage || 0)}/{PSYCH_LIMIT[patient.package] ?? 0} w pakiecie{(patient.psychPaid || 0) > 0 ? `, ${patient.psychPaid} płatne` : ''} <ArrowRight className="h-4 w-4" />
+                      </button>
                     </div>
                   </td>
 
@@ -1266,6 +1264,7 @@ const PatientList: React.FC<PatientListProps> = ({ patients, onUpdatePatient, on
           </table>
         </div>
       </div>
+      {psychPatient && <PsychiatristPanel patient={psychPatient} onClose={() => setPsychPatient(null)} />}
       {notesPatient && <PatientNotesPanel patient={notesPatient} onSave={onSaveNotes} onClose={() => setNotesPatient(null)} />}
     </div>
   );

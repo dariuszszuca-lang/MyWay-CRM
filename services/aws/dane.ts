@@ -246,3 +246,31 @@ export async function przygotujUmowe(id: string, spolka: 'bella' | 'myway'): Pro
   zmieniono('pacjenci');
   return swieza;
 }
+
+// ---------- Psychiatra: wizyty i limit konsultacji z pakietu ----------
+export interface WizytaPsychiatry {
+  id: string; data: string; godzina?: string; uwagi?: string;
+  status: 'zarejestrowana' | 'potwierdzona' | 'zrealizowana' | 'anulowana' | 'niezglosil';
+  rozliczenie: 'pakiet' | 'platna'; zrodlo?: 'recznie' | 'arkusz';
+  historia?: { czas: string; konto: string; zmiana: string }[];
+}
+export interface PodsumowaniePsychiatry { limit: number; zarezerwowane: number; zrealizowane: number; pozostalo: number; platne: number }
+
+export async function pobierzWizyty(id: string): Promise<{ wizyty: WizytaPsychiatry[]; psychiatra: PodsumowaniePsychiatry }> {
+  const f = await api('GET', `/pacjenci/${id}/finanse`);
+  return { wizyty: f.wizyty || [], psychiatra: f.psychiatra };
+}
+
+export async function dodajWizyte(id: string, w: { data: string; godzina?: string; uwagi?: string }): Promise<{ id: string; rozliczenie: 'pakiet' | 'platna' }> {
+  const r = await api('POST', `/pacjenci/${id}/wizyty`, { data: w.data, ...(w.godzina ? { godzina: w.godzina } : {}), ...(w.uwagi ? { uwagi: w.uwagi } : {}) });
+  pelneKarty.delete(id);
+  zmieniono('pacjenci');
+  return r;
+}
+
+export async function zmienWizyte(id: string, wizytaId: string, zmiana: { status?: WizytaPsychiatry['status']; data?: string; godzina?: string; uwagi?: string }): Promise<{ przeniesionaDoPakietu?: string }> {
+  const r = await api('PUT', `/pacjenci/${id}/wizyty/${wizytaId}`, zmiana);
+  pelneKarty.delete(id);
+  zmieniono('pacjenci');
+  return r;
+}
