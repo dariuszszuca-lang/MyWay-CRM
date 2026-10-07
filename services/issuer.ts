@@ -19,7 +19,7 @@ export const CONTRACT_ISSUERS: Record<ContractIssuerKey, { label: string; party:
     label: 'Bella Vita 3City Sp. z o.o.',
     party: 'Bella Vita 3City Sp. z o.o., NIP: 588-242-22-71, ul. Wichrowe Wzgórza 21, 84-200 Kąpino',
     fullName: 'Bella Vita 3City',
-    registry: 'wpisaną do Krajowego Rejestru Sądowego – Rejestru Przedsiębiorców przez Sąd Rejonowy Gdańsk Północ w Gdańsku, VII Wydział Gospodarczy Krajowego Rejestru Sądowego pod numerem KRS: 0000644953',
+    registry: 'wpisaną do Krajowego Rejestru Sądowego – Rejestru Przedsiębiorców przez Sąd Rejonowy Gdańsk Północ w Gdańsku, VII Wydział Gospodarczy Krajowego Rejestru Sądowego pod numerem KRS: 0000644953, NIP: 588-242-22-71',
   },
   myway: {
     // Dane z KRS (odpis aktualny, stan na 29.08.2026): nazwa rejestrowa to „My Way Ośrodek”, nie „Ośrodek MyWay”.
