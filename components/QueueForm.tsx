@@ -343,8 +343,8 @@ const QueueForm: React.FC<QueueFormProps> = ({ onSubmit, initialData, onCancel, 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {[
               { value: undefined, label: 'Bez detoksu', amount: 0, desc: 'Pacjent nie potrzebuje detoksu' },
-              { value: '1day' as const, label: 'Detoks 1 dzień', amount: 1000, desc: '1 doba detoksu' },
-              { value: '3days' as const, label: 'Detoks 3 dni', amount: 2700, desc: '3 doby detoksu' },
+              { value: '1day' as const, label: 'Detoks 1 dzień', amount: 1200, desc: '1 doba detoksu' },
+              { value: '3days' as const, label: 'Detoks 3 dni', amount: 3600, desc: '3 doby detoksu' },
             ].map((opt, idx) => (
               <label
                 key={idx}

@@ -135,7 +135,7 @@ export interface QueuePatient {
   plannedArrivalTime?: string; // Planowana godzina przyjazdu w formacie HH:MM (opcjonalna)
   notes: string;
   // Dodatkowe usługi — detoks (pakiet 1-dniowy lub 3-dniowy)
-  detoksPackage?: '1day' | '3days';  // '1day' = 1000 zł, '3days' = 2700 zł. Undefined = brak detoksu.
+  detoksPackage?: '1day' | '3days';  // '1day' = 1200 zł, '3days' = 3600 zł (ceny od 07.10.2026). Undefined = brak detoksu.
   // Powiązanie z kartą pacjenta w CRM (dla wracających)
   linkedPatientId?: string;
   // Stan

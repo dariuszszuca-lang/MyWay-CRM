@@ -169,8 +169,8 @@ const PatientForm: React.FC<PatientFormProps> = ({ onSubmit, initialData, onCanc
       // Detoks z kolejki → dodaj jako usługę dodatkową (z kwotą i typem)
       if (prefillFromQueue.detoksPackage) {
         const detoksConfig = {
-          '1day': { amount: 1000, note: 'Detoks 1 dzień' },
-          '3days': { amount: 2700, note: 'Detoks 3 dni' },
+          '1day': { amount: 1200, note: 'Detoks 1 dzień' },
+          '3days': { amount: 3600, note: 'Detoks 3 dni' },
         }[prefillFromQueue.detoksPackage];
         setServices(prev => {
           const hasDetoks = prev.some(s => s.type === 'detoks');
