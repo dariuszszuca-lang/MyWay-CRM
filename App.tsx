@@ -17,7 +17,7 @@ import { AWS_CONFIG } from './services/aws/config';
 import { sendWelcomeEmail, confirmPatientEmail, dischargePatientEmail } from './services/getResponseService';
 import {
   DaneWypisu, dodajDoKolejki, dodajPacjenta, dodajWplate, integracjeWlaczone, pobierzKarteKolejki, pobierzKolejke, pobierzPacjentow, pobierzPelnego,
-  przywroc, usunPacjenta, usunZKolejki, wypisz, zapiszKolejke, zapiszNotatki, zapiszPacjenta, zmienWypis,
+  przywroc, usunPacjenta, usunZKolejki, wypisz, zapiszKolejke, zapiszNotatki, zapiszPacjenta, zmienWypis, alertArkusza,
 } from './services/aws/dane';
 
 // Gałąź aws: dane i logowanie na koncie AWS MyWay (Frankfurt).
@@ -453,6 +453,40 @@ const App: React.FC = () => {
             <span className="block sm:inline">{error}</span>
           </div>
         )}
+
+        {/* Alert: zgłoszenia do psychiatry z formularza, których CRM nie przypisał do pacjenta (albo brak połączenia z arkuszem) */}
+        {(() => {
+          const a = alertArkusza();
+          if (!a) return null;
+          const POWODY: Record<string, string> = {
+            'brak-pacjenta': 'nie ma pacjenta z takim numerem PESEL w CRM', niejednoznaczne: 'kilka kart z tym numerem PESEL', 'brak-pakietu': 'karta bez pakietu',
+            'zly-pesel': 'błędny numer PESEL w arkuszu', 'brak-daty': 'brak daty zgłoszenia i daty wizyty',
+          };
+          return (
+            <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-6" role="status">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="w-5 h-5 text-violet-600" aria-hidden="true" />
+                <h3 className="font-bold text-violet-800 text-sm">Zapisy do psychiatry z formularza: do wyjaśnienia</h3>
+              </div>
+              {a.bladPolaczenia && (
+                <p className="text-sm text-red-700 bg-white rounded-lg p-3 border border-red-200 mb-2">CRM nie mógł odczytać arkusza zapisów. Nowe zgłoszenia nie wczytują się, dopóki połączenie nie wróci. Daj znać Darkowi.</p>
+              )}
+              <div className="space-y-2">
+                {a.wiersze.map((w) => (
+                  <div key={w.wiersz} className="flex flex-wrap items-center justify-between gap-2 bg-white rounded-lg p-3 border border-violet-100">
+                    <div>
+                      <span className="font-semibold text-gray-800">{w.osoba || 'bez nazwiska'}</span>
+                      <span className="text-gray-400 mx-2">·</span>
+                      <span className="text-sm text-gray-500">wiersz {w.wiersz} w arkuszu{w.dzien ? `, ${w.dzien}` : ''}</span>
+                    </div>
+                    <span className="text-violet-700 font-medium text-sm">{POWODY[w.powod] || w.powod}</span>
+                  </div>
+                ))}
+              </div>
+              {a.wiersze.length > 0 && <p className="text-xs text-gray-600 mt-3">Popraw PESEL w arkuszu albo w karcie pacjenta. Wizyta wczyta się sama w ciągu 15 minut i ten komunikat zniknie.</p>}
+            </div>
+          );
+        })()}
 
         {/* Payment Alert — 14 days before therapy end */}
         {(() => {

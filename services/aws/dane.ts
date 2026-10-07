@@ -24,9 +24,15 @@ const TYLKO_W_KARCIE = ['adres', 'email', 'dowod', 'terminPlatnosci'];
 const kopia = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
 
 // ---------- pacjenci ----------
+// Alert z synchronizacji arkusza zapisów do psychiatry: przychodzi razem z listą pacjentów (odświeżaną co 20 s).
+export interface AlertArkusza { wiersze: { wiersz: number; osoba: string; powod: string; dzien?: string }[]; bladPolaczenia: boolean; sprawdzono?: string }
+let alertArkuszaBiezacy: AlertArkusza | null = null;
+export const alertArkusza = (): AlertArkusza | null => alertArkuszaBiezacy;
+
 export async function pobierzPacjentow(): Promise<Patient[]> {
   const r = await api('GET', '/pacjenci');
   osrodekBiezacy = r.osrodek || '';
+  alertArkuszaBiezacy = r.alertyArkusza || null;
   const lista: Patient[] = (r.pacjenci || []).map((x: any) => pacjentZApi(x));
   wierszeListy.clear();
   lista.forEach((p) => wierszeListy.set(p.id, kopia(p)));
