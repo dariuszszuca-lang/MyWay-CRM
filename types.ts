@@ -183,9 +183,8 @@ export const PACKAGE_ORDER: PatientPackage[] = ['1', '2', '3', '6tyg', '8tyg', '
 // Pakiety bez kwoty bazowej (rozliczane są tylko usługi dodatkowe), domyślnie poza statystykami.
 // Przyjazd na 5. tydzień i powrót z przerwy warunkowej działają jak Grupa VIP (prośba Krystiana 06.10.2026).
 export const PACKAGES_WITHOUT_BASE: PatientPackage[] = ['vip', 'przyjazd_5tyg', 'powrot_przerwa'];
-// Dla tych dwóch pakietów maile powitalne i pożegnalne oraz listy GetResponse są na razie WYŁĄCZONE:
-// usługa wysyłki nie zna ich nazw (wysłałaby „Pakiet przyjazd_5tyg” i dopisała do listy Pakietu 1).
-// Włączyć po decyzji, czy i jakie maile mają dostawać.
+// Dla tych dwóch pakietów NIE wysyłamy maili powitalnych ani pożegnalnych i nie dopisujemy do list GetResponse
+// (decyzja Darka i Krystiana 07.10.2026: to powroty w ramach tej samej umowy, nie nowe przyjęcia).
 export const PACKAGES_WITHOUT_MAILS: PatientPackage[] = ['przyjazd_5tyg', 'powrot_przerwa'];
 export const isPackageWithoutMails = (pkg: string): boolean => PACKAGES_WITHOUT_MAILS.includes(pkg as PatientPackage);
 export const isPackageWithoutBase = (pkg: string): boolean => PACKAGES_WITHOUT_BASE.includes(pkg as PatientPackage);
