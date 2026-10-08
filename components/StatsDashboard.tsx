@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { Patient, packageLabel, formatCurrency, getAmountDue, getAdditionalServicesTotal, normalizeVoivodeship, isInterruptedTherapy, DISCHARGE_TYPE_LABELS, SERVICE_TYPE_LABELS } from '../types';
-import { averagePerPatient, DEFAULT_EXCLUDED_PACKAGES } from '../services/statsCalc';
+import { averagePerPatient, contractsByIssuer, DEFAULT_EXCLUDED_PACKAGES } from '../services/statsCalc';
+import { CONTRACT_ISSUERS } from '../services/issuer';
 import type { AdditionalServiceType } from '../types';
 import { generateStatsPDF, StatsData } from '../services/pdfGenerator';
-import { Download, Users, Wallet, AlertTriangle, TrendingUp, Calendar, RotateCcw, UserX, Stethoscope } from 'lucide-react';
+import { Download, Users, Wallet, AlertTriangle, TrendingUp, Calendar, RotateCcw, UserX, Stethoscope, FileText } from 'lucide-react';
 
 interface StatsDashboardProps {
   patients: Patient[];
@@ -123,6 +124,8 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
 
     return { active, discharged, totalRevenue, totalCollected, totalOutstanding, unpaidCount, collectionRate, totalRefunds, netRevenue, interruptedCount, interruptedByType, totalServicesAmount, servicesByType };
   }, [filtered]);
+
+  const contracts = useMemo(() => contractsByIssuer(filtered), [filtered]);
 
   // Package breakdown
   const packages = useMemo(() => {
@@ -376,6 +379,29 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients }) => {
             {stats.servicesByType.filter(s => s.count > 0).map(s => `${SERVICE_TYPE_LABELS[s.type]}: ${s.count}`).join(', ') || 'brak'}
           </div>
         </div>
+      </div>
+
+      {/* Umowy wg spółki */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h3 className="text-sm font-bold text-gray-700 uppercase mb-4 flex items-center gap-2">
+          <FileText className="w-4 h-4 text-teal-600" />
+          Umowy wg spółki
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-teal-50 rounded-xl p-4">
+            <p className="text-xs font-bold uppercase text-teal-700">{CONTRACT_ISSUERS.bella.label}</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">{contracts.bella}</p>
+          </div>
+          <div className="bg-blue-50 rounded-xl p-4">
+            <p className="text-xs font-bold uppercase text-blue-700">{CONTRACT_ISSUERS.myway.label}</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">{contracts.myway}</p>
+          </div>
+          <div className="bg-gray-50 rounded-xl p-4">
+            <p className="text-xs font-bold uppercase text-gray-600">Bez zapisanej spółki</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">{contracts.brak}</p>
+          </div>
+        </div>
+        <p className="text-xs text-gray-400 mt-3">Spółka zapisuje się przy wydruku umowy (od 06.10.2026). Karty bez zapisanej spółki to starsze umowy albo umowy jeszcze niewydrukowane.</p>
       </div>
 
       {/* Additional Services Details */}

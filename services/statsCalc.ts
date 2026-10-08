@@ -5,6 +5,23 @@
 
 export const DEFAULT_EXCLUDED_PACKAGES: string[] = ['vip', 'przyjazd_5tyg', 'powrot_przerwa'];
 
+// Umowy wg spółki: karta liczy się do spółki zapisanej przy wydruku umowy.
+// Karty bez zapisanej spółki (umowy sprzed 06.10.2026 albo jeszcze niewydrukowane) idą osobno, bez zgadywania.
+export interface ContractsByIssuer {
+  bella: number;
+  myway: number;
+  brak: number;
+}
+
+export const contractsByIssuer = (patients: { issuer?: string }[]): ContractsByIssuer => {
+  const wynik: ContractsByIssuer = { bella: 0, myway: 0, brak: 0 };
+  for (const p of patients) {
+    if (p.issuer === 'bella' || p.issuer === 'myway') wynik[p.issuer] += 1;
+    else wynik.brak += 1;
+  }
+  return wynik;
+};
+
 export interface AveragePerPatientInput {
   package: string;
   totalAmount: number;

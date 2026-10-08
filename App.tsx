@@ -28,6 +28,7 @@ import {
 type ActiveTab = 'form' | 'list' | 'queue' | 'stats' | 'rooms' | 'reports' | 'dziennik' | 'telefony';
 
 const komunikat = (e: unknown) => (e instanceof Error ? e.message : 'Nieznany błąd.');
+const maUwagi = (tekst?: string) => Boolean(tekst && tekst.trim());
 
 const App: React.FC = () => {
   const [user, setUser] = useState<Sesja | null>(null);
@@ -43,6 +44,7 @@ const App: React.FC = () => {
   // Prefill from queue → form
   const [prefillQueue, setPrefillQueue] = useState<QueuePatient | null>(null);
   const [admittingQueueId, setAdmittingQueueId] = useState<string | null>(null);
+  const [uwagiPrzedPrzyjeciem, setUwagiPrzedPrzyjeciem] = useState<QueuePatient | null>(null);
 
   // 1. Sesja: przy starcie sprawdzamy, czy w tej karcie jest ważne logowanie.
   useEffect(() => {
@@ -282,11 +284,18 @@ const App: React.FC = () => {
   };
 
   // Przyjęcie z kolejki: pobieramy pełny wpis (PESEL, dowód, adres) i wypełniamy nim formularz.
+  // Wpis z uwagami zatrzymuje się na oknie „Uwagi”: do formularza przechodzi się dopiero po potwierdzeniu przeczytania.
+  const przejdzDoPrzyjecia = (wpis: QueuePatient) => {
+    setPrefillQueue(wpis);
+    setAdmittingQueueId(wpis.id);
+    setActiveTab('form');
+  };
+
   const handleAdmitPatient = async (queuePatient: QueuePatient) => {
     try {
-      setPrefillQueue(await pobierzKarteKolejki(queuePatient.id));
-      setAdmittingQueueId(queuePatient.id);
-      setActiveTab('form');
+      const wpis = await pobierzKarteKolejki(queuePatient.id);
+      if (maUwagi(wpis.notes)) setUwagiPrzedPrzyjeciem(wpis);
+      else przejdzDoPrzyjecia(wpis);
     } catch (err) {
       alert(`Nie udało się otworzyć wpisu z kolejki. ${komunikat(err)}`);
     }
@@ -612,6 +621,24 @@ const App: React.FC = () => {
 
             {activeTab === 'queue' && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {uwagiPrzedPrzyjeciem && (
+                  <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="uwagi-tytul">
+                    <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
+                      <h3 id="uwagi-tytul" className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                        <AlertTriangle className="w-5 h-5 text-amber-600" />
+                        Uwagi: {uwagiPrzedPrzyjeciem.firstName} {uwagiPrzedPrzyjeciem.lastName}
+                      </h3>
+                      <p className="text-sm text-gray-600 mt-1">Przeczytaj uwagi przed przyjęciem.</p>
+                      <div className="mt-4 max-h-[50vh] overflow-y-auto bg-amber-50 border border-amber-200 rounded-lg p-4 text-base text-gray-900 whitespace-pre-wrap">
+                        {uwagiPrzedPrzyjeciem.notes}
+                      </div>
+                      <div className="mt-6 flex gap-3 justify-end">
+                        <button type="button" onClick={() => setUwagiPrzedPrzyjeciem(null)} className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">Wróć do kolejki</button>
+                        <button type="button" onClick={() => { const wpis = uwagiPrzedPrzyjeciem; setUwagiPrzedPrzyjeciem(null); przejdzDoPrzyjecia(wpis); }} className="px-4 py-2 text-sm font-semibold text-white bg-teal-600 rounded-lg hover:bg-teal-700">Przeczytałem</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="mb-6">
                   <h2 className="text-2xl font-bold text-gray-800">Kolejka oczekujących</h2>
                   <p className="text-gray-500">Osoby które wpłaciły zaliczkę i czekają na termin.</p>

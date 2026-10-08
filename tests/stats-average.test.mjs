@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { averagePerPatient, DEFAULT_EXCLUDED_PACKAGES } from '../services/statsCalc.ts';
+import { averagePerPatient, contractsByIssuer, DEFAULT_EXCLUDED_PACKAGES } from '../services/statsCalc.ts';
 
 const patient = (pkg, totalAmount, additionalServices = []) => ({ package: pkg, totalAmount, additionalServices });
 
@@ -32,4 +32,9 @@ test('usługa bez kwoty nie psuje sumy', () => {
 
 test('domyślnie wykluczona jest tylko Grupa VIP', () => {
   assert.deepEqual(DEFAULT_EXCLUDED_PACKAGES, ['vip']);
+});
+
+test('umowy wg spółki: karta bez zapisanej spółki nie jest przypisywana do żadnej', () => {
+  const wynik = contractsByIssuer([{ issuer: 'bella' }, { issuer: 'myway' }, { issuer: 'myway' }, {}, { issuer: undefined }]);
+  assert.deepEqual(wynik, { bella: 1, myway: 2, brak: 2 });
 });
