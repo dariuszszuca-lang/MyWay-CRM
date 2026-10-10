@@ -42,7 +42,7 @@ test('typy statusów zgadzają się z ustaleniami', () => {
 
 test('zamówienia idą do funkcji w projekcie EduWay, z tokenem zalogowanego', () => {
   assert.match(api, /europe-west1-eduway-f13c4\.cloudfunctions\.net\/ordersApi/, 'zły adres API');
-  assert.match(api, /getIdToken\(\)/, 'brak tokenu użytkownika');
+  assert.match(api, /tokenTozsamosci/, 'brak tokenu użytkownika (logowanie AWS)');
   assert.match(api, /Authorization: `Bearer \$\{token\}`/, 'token nie jest wysyłany w nagłówku');
 });
 

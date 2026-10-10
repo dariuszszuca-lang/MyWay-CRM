@@ -30,8 +30,8 @@ test('usługa bez kwoty nie psuje sumy', () => {
   assert.equal(result.revenue, 1000);
 });
 
-test('domyślnie wykluczona jest tylko Grupa VIP', () => {
-  assert.deepEqual(DEFAULT_EXCLUDED_PACKAGES, ['vip']);
+test('domyślnie wykluczone: Grupa VIP, przyjazd na 5 tygodni i powrót po przerwie', () => {
+  assert.deepEqual(DEFAULT_EXCLUDED_PACKAGES, ['vip', 'przyjazd_5tyg', 'powrot_przerwa']);
 });
 
 test('umowy wg spółki: karta bez zapisanej spółki nie jest przypisywana do żadnej', () => {
