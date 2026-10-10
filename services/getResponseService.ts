@@ -1,8 +1,17 @@
 import type { PatientPackage } from '../types';
+import { sesja } from './aws/auth';
 // GetResponse Integration Service
-// Dodaje nowych pacjentów MyWay do GetResponse przez Cloud Functions
+// Dodaje nowych pacjentów MyWay do GetResponse i wysyła maile powitalny oraz pożegnalny.
+// Od przeniesienia rezerwacji na AWS te adresy są częścią API rezerwacji i wymagają tokenu pracownika CRM
+// (wcześniej: publiczne funkcje Firebase w projekcie myway-point-app).
 
-const CF_BASE = 'https://europe-west1-myway-point-app.cloudfunctions.net';
+export const CF_BASE = 'https://glkbxptm1f.execute-api.eu-central-1.amazonaws.com/crm';
+
+// Nagłówki zapytania z tokenem zalogowanego pracownika.
+export const naglowkiCrm = async (): Promise<Record<string, string>> => {
+  const s = await sesja();
+  return { 'Content-Type': 'application/json', ...(s ? { authorization: `Bearer ${s.token}` } : {}) };
+};
 
 interface PatientEmailData {
   email: string;
@@ -20,7 +29,7 @@ export const sendWelcomeEmail = async (patient: PatientEmailData): Promise<boole
   try {
     const response = await fetch(`${CF_BASE}/addPatientToGetResponse`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await naglowkiCrm(),
       body: JSON.stringify({
         email: patient.email,
         firstName: patient.firstName,
@@ -63,7 +72,7 @@ export const confirmPatientEmail = async (data: {
   try {
     const response = await fetch(`${CF_BASE}/onPatientConfirmed`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await naglowkiCrm(),
       body: JSON.stringify(data),
     });
 
@@ -98,7 +107,7 @@ export const dischargePatientEmail = async (data: {
   try {
     const response = await fetch(`${CF_BASE}/onPatientDischarged`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await naglowkiCrm(),
       body: JSON.stringify(data),
     });
 

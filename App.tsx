@@ -14,7 +14,7 @@ import { Activity, Users, Cloud, RefreshCw, LogOut, Clock, BarChart3, AlertTrian
 import { Sesja, sesja as pobierzSesje, wyloguj } from './services/aws/auth';
 import { nasluchuj, ustawObslugeWygasniecia } from './services/aws/api';
 import { AWS_CONFIG } from './services/aws/config';
-import { sendWelcomeEmail, confirmPatientEmail, dischargePatientEmail } from './services/getResponseService';
+import { sendWelcomeEmail, confirmPatientEmail, dischargePatientEmail, CF_BASE, naglowkiCrm } from './services/getResponseService';
 import {
   DaneWypisu, dodajDoKolejki, dodajPacjenta, dodajWplate, integracjeWlaczone, pobierzKarteKolejki, pobierzKolejke, pobierzPacjentow, pobierzPelnego,
   przywroc, usunPacjenta, usunZKolejki, wypisz, zapiszKolejke, zapiszNotatki, zapiszPacjenta, zmienWypis, alertArkusza,
@@ -104,9 +104,9 @@ const App: React.FC = () => {
 
         if (patientData.package === '3') {
           try {
-            const response = await fetch('https://europe-west1-myway-point-app.cloudfunctions.net/createPatientFromCRM', {
+            const response = await fetch(`${CF_BASE}/createPatientFromCRM`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: await naglowkiCrm(),
               body: JSON.stringify({
                 firstName: patientData.firstName,
                 lastName: patientData.lastName,
